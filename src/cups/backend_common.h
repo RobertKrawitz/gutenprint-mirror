@@ -110,6 +110,7 @@ enum {
 	P_DNP_DS820,
 	P_DNP_DSRX1,
 	P_DNP_QW410,
+	P_DNP_DSX80,
 	P_ES1,
 	P_ES2_20,
 	P_ES3_30,

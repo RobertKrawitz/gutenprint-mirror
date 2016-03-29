@@ -209,6 +209,9 @@
 # Mitsubishi CP-K60DW-S
 0x06d3 0x3b31 blacklist
 
+# Mitsubishi CP-W5000DW
+0x06d3 0x3b50 blacklist
+
 # Mitsubishi CP-9000D/DW/AM
 0x06d3 0x0394 blacklist
 0x06d3 0x0395 blacklist
@@ -278,6 +281,12 @@
 
 # DNP QW410
 0x1452 0x9201 blacklist
+
+# DNP DS480
+0x1452 0x8f01 blacklist
+
+# DNP DS680
+0x1452 0x8e01 blacklist
 
 # CIAAT Brava 21
 0x10ce 0x001e blacklist

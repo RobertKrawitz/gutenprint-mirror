@@ -1,7 +1,7 @@
 /*
  *   Mitsubishi Photo Printer Comon Code
  *
- *   (c) 2013-2021 Solomon Peachy <pizza@shaftnet.org>
+ *   (c) 2013-2023 Solomon Peachy <pizza@shaftnet.org>
  *
  *   The latest version of this program can be found at:
  *
@@ -342,6 +342,13 @@ const char *mitsu_media_types(int printer, uint8_t brand, uint8_t type)
 			return "CK-D723 (6x9)";
 		else if (type == 0x0f)
 			return "CK-D720 (6x8)";
+	} else if (brand == 0xd6) {  /* DNP */
+		if (type == 0x74)
+			return "DNP 5x7";
+		else if (type == 0x7f)
+			return "DNP 6x8";
+		else if (type == 0x90)
+			return "DNP 4x8";
 	}
 
 	return "Unknown";

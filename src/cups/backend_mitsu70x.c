@@ -1,7 +1,7 @@
 /*
  *   Mitsubishi CP-D70/D707 Photo Printer CUPS backend -- libusb-1.0 version
  *
- *   (c) 2013-2021 Solomon Peachy <pizza@shaftnet.org>
+ *   (c) 2013-2023 Solomon Peachy <pizza@shaftnet.org>
  *
  *   The latest version of this program can be found at:
  *
@@ -9,7 +9,7 @@
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the Free
- *   Software Foundation; either version 2 of the License, or (at your option)
+ *   Software Foundation; either version 3 of the License, or (at your option)
  *   any later version.
  *
  *   This program is distributed in the hope that it will be useful, but
@@ -20,7 +20,7 @@
  *   You should have received a copy of the GNU General Public License
  *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  *
- *   SPDX-License-Identifier: GPL-2.0+
+ *   SPDX-License-Identifier: GPL-3.0+
  *
  */
 
@@ -574,7 +574,6 @@ static const char *mitsu70x_errors(uint8_t *err)
 	return "Unknown error";
 }
 
-
 #define CMDBUF_LEN 512
 #define READBACK_LEN 256
 
@@ -682,9 +681,10 @@ static int mitsu70x_attach(void *vctx, struct dyesub_connection *conn, uint8_t j
 		   v1.02: M 316E81 1433   (Add Ultrafine and matte support)
 		   v1.04: M 316F83 2878   (Add 2x6 strip and support new "Triton" media)
 		   v3.01: M 443A12 8908   (add 5" media support)
+		   v3.02: M 443B11 2647   (Unknown)
 		*/
-		if (strncmp(resp.vers[0].ver, "443A12", 6) < 0)
-			WARNING("Printer FW out of date. Highly recommend upgrading EK305 to v3.01 or newer!\n");
+		if (strncmp(resp.vers[0].ver, "443B11", 6) < 0)
+			WARNING("Printer FW out of date. Highly recommend upgrading EK305 to v3.02 or newer!\n");
 	} else if (ctx->conn->type == P_MITSU_K60) {
 		/* Known versions:
 		   v1.05: M 316M31 148C   (Add HG media support)
@@ -779,11 +779,18 @@ static void *mitsu70x_combine_jobs(const void *vjob1,
 		finalpad = 0;
 		lamoffset = 0;
 		break;
-	case 1228:  /* D70, ASK300, D80 */
-		newrows = 2730;
-		newpad = 38;
-		finalpad = 236;
-		lamoffset = 12;
+	case 1228:  /* D70, ASK300, D80, DS480/DS680 */
+		if (job1->cols == 1264) { // DS480 4" wide..
+			newrows = 2494;
+			newpad = 38;
+			finalpad = 0;
+			lamoffset = 12;
+		} else {
+			newrows = 2730;
+			newpad = 38;
+			finalpad = 236;
+			lamoffset = 12;
+		}
 		break;
 	case 1076: /* EK305, K60 3.5x5" prints */
 		newrows = 2190;
@@ -1030,6 +1037,20 @@ repeat:
 			WARNING("Print job has wrong submodel specifier (%x)\n", mhdr.hdr[3]);
 			mhdr.hdr[3] = 0x80;
 		}
+	} else if (ctx->conn->type == P_DNP_DSX80) { // XXX Correct when we get it.
+		job->laminatefname = "D70MAT01.raw";
+		job->lutfname = "CPD70L01.lut";
+
+		if (mhdr.speed == 3 || mhdr.speed == 4) {
+			mhdr.speed = 3; /* Super Fine */
+			job->cpcfname = "CPD70S01.cpc";
+		} else {
+			job->cpcfname = "CPD70N01.cpc";
+		}
+		if (mhdr.hdr[3] != 0x04) {
+			WARNING("Print job has wrong submodel specifier (%x)\n", mhdr.hdr[3]);
+			mhdr.hdr[3] = 0x04;
+		}
 	}
 	if (!mhdr.use_lut)
 		job->lutfname = NULL;
@@ -1139,6 +1160,18 @@ repeat:
 bypass_raw:
 	for (i = 0 ; i < ctx->num_decks ; i++) {
 		switch (ctx->medias[i]) {
+		case 0x0: // 4x8 (DS480 only)
+			if (job->rows == 1228 ||
+			    job->rows == 1614 ||
+			    job->rows == 2422 ||
+			    job->rows == 2494)
+				job->decks_ok[i] = 1;
+			if (job->rows == 2422 ||
+			    job->rows == 2494)
+				job->decks_exact[i] = 1;
+			if (job->cols != 1264)
+				job->decks_ok[i] = job->decks_exact[i] = 0;
+			break;
 		case 0x1: // 5x3.5
 			if (job->rows == 1076)
 				job->decks_ok[i] = 1;
@@ -1198,7 +1231,8 @@ bypass_raw:
 		if (ctx->medias[0] == 0xf ||
 		    ctx->medias[0] == 0x5 ||
 		    ctx->medias[1] == 0xf || /* Two decks possible */
-		    ctx->medias[1] == 0x5)
+		    ctx->medias[1] == 0x5 ||
+		    ctx->medias[0] == 0x00 /* DS480 only */)
 			job->common.can_combine = !job->raw_format;
 	} else if (job->rows == 1076) {
 		if (ctx->conn->type == P_KODAK_305 ||
@@ -2194,6 +2228,8 @@ static void mitsu70x_dump_printerstatus(struct mitsu70x_ctx *ctx,
 	uint8_t memory = ~resp->memory;
 
 	INFO("Model         : ");
+	if (resp->model[5] == '-')
+		resp->model[5] = ' ';
 	for (i = 0 ; i < 6 ; i++) {
 		DEBUG2("%c", le16_to_cpu(resp->model[i]) & 0x7f);
 	}
@@ -2577,13 +2613,14 @@ static const char *mitsu70x_prefixes[] = {
 	"mitsu70x", // Family entry, do not nuke.
 	// backwards compatibility
 	"mitsud80", "mitsuk60", "kodak305", "fujiask300",
+	"dnpds480", "dnpds680",
 	NULL,
 };
 
 /* Exported */
 const struct dyesub_backend mitsu70x_backend = {
 	.name = "Mitsubishi CP-D70 family",
-	.version = "0.106" " (lib " LIBMITSU_VER ")",
+	.version = "0.106-dnp3" " (lib " LIBMITSU_VER ")",
 	.flags = BACKEND_FLAG_DUMMYPRINT,
 	.uri_prefixes = mitsu70x_prefixes,
 	.cmdline_usage = mitsu70x_cmdline,
@@ -2606,6 +2643,8 @@ const struct dyesub_backend mitsu70x_backend = {
 		{ 0x06d3, 0x3b36, P_MITSU_D80, NULL, "mitsubishi-d80dw"},
 		{ 0x040a, 0x404f, P_KODAK_305, NULL, "kodak-305"},
 		{ 0x04cb, 0x5006, P_FUJI_ASK300, NULL, "fujifilm-ask-300"},
+		{ 0x1452, 0x8e01, P_DNP_DSX80, NULL, "dnp-ds680"},
+		{ 0x1452, 0x8f01, P_DNP_DSX80, NULL, "dnp-ds480"},
 		{ 0, 0, 0, NULL, NULL}
 	}
 };
@@ -2633,14 +2672,14 @@ const struct dyesub_backend mitsu70x_backend = {
 
    (padded by NULLs to a 512-byte boundary)
 
-   PP    == 0x01 on D70x/D80, 0x00 on K60, 0x90 on K305, 0x80 on ASK300
+   PP    == 0x01 on D70x/D80, 0x00 on K60, 0x90 on K305, 0x80 on ASK300, 0x04 on DSx80
    JJ JJ == Job ID, can leave at 00 00
    XX XX == columns
    YY YY == rows
    QQ QQ == lamination columns (equal to XX XX)
    ZZ ZZ == lamination rows (YY YY + 12 on D70x/D80/ASK300, YY YY on others)
    RR RR == "rewind inhibit", 01 01 enabled, normally 00 00 (All but D70x/A300)
-   SS    == Print mode: 00 = Fine, 03 = SuperFine (D70x/D80 only), 04 = UltraFine
+   SS    == Print mode: 00 = Fine, 03 = SuperFine (D70x/D80/DSx80 only), 04 = UltraFine
             (Matte requires Superfine or Ultrafine)
    UU    == 00 = Auto, 01 = Lower Deck (required for !D70x), 02 = Upper Deck
    LL    == lamination enable, 00 == on, 01 == off

@@ -6180,7 +6180,7 @@ static void mitsu_cpd70k60_printer_init(stp_vars_t *v, unsigned char model)
   stp_putc(0x1b, v);
   stp_putc(0x5a, v);
   stp_putc(0x54, v);
-  stp_putc(model, v); /* k60 == x00, EK305 == x90, d70x/d80 == x01, ask300 = 0x80 */
+  stp_putc(model, v); /* k60 == x00, EK305 == x90, d70x/d80 == x01, ask300 = 0x80, DSx80 == x04 */
   dyesub_nputc(v, 0x00, 12);
 
   stp_put16_be(pd->w_size, v);
@@ -6234,6 +6234,8 @@ static void mitsu_cpd70k60_printer_init(stp_vars_t *v, unsigned char model)
   } else if (strcmp(pd->pagesize,"w432h576-div4") == 0) {
     stp_putc(0x04, v);
 #endif
+  } else if (strcmp(pd->pagesize,"w288h576-div2") == 0) {
+    stp_putc(0x01, v);
   } else if (strcmp(pd->pagesize,"w360h504-div2") == 0) {
     stp_putc(0x01, v);
   } else if (strcmp(pd->pagesize,"w288h432-div2") == 0) {
@@ -6374,6 +6376,116 @@ static const dyesub_printsize_t mitsu_cpd80_printsize[] =
 };
 
 LIST(dyesub_printsize_list_t, mitsu_cpd80_printsize_list, dyesub_printsize_t, mitsu_cpd80_printsize);
+
+/* DNP DS480 */
+
+static const dyesub_pagesize_t dnp_ds480_page[] =
+{
+  DEFINE_PAPER_SIMPLE("w288h288", "4x4", PT1(1228,300), PT1(1264,300), DYESUB_LANDSCAPE),
+  DEFINE_PAPER_SIMPLE("w288h382", "4x5.3", PT1(1264,300), PT1(1614,300), DYESUB_PORTRAIT),
+//  DEFINE_PAPER_SIMPLE("w288h432", "4x6", PT1(1264,300), PT1(1828,300), DYESUB_PORTRAIT),
+  DEFINE_PAPER_SIMPLE("w288h576", "4x8", PT1(1264,300), PT1(2422,300), DYESUB_PORTRAIT),
+  DEFINE_PAPER_SIMPLE("w288h576-div2", "4x4*2", PT1(1264,300), PT1(2494,300), DYESUB_PORTRAIT),
+};
+
+LIST(dyesub_pagesize_list_t, dnp_ds480_page_list, dyesub_pagesize_t, dnp_ds480_page);
+
+static const dyesub_printsize_t dnp_ds480_printsize[] =
+{
+  { "300x300", "w288h288", 1228, 1264},
+  { "300x300", "w288h382", 1264, 1614},
+//  { "300x300", "w288h432", 1264, 1828},
+  { "300x300", "w288h576", 1264, 2422},
+  { "300x300", "w288h576-div2", 1264, 2494},
+};
+
+LIST(dyesub_printsize_list_t, dnp_ds480_printsize_list, dyesub_printsize_t, dnp_ds480_printsize);
+
+static void dnp_ds4x0_printer_init(stp_vars_t *v)
+{
+  mitsu_cpd70k60_printer_init(v, 0x04);
+}
+
+static const dyesub_stringitem_t dnp_ds4x0_qualities[] =
+{
+  { "Fine",      N_ ("Fine") },
+  { "SuperFine", N_ ("Super Fine") },
+};
+LIST(dyesub_stringlist_t, dnp_ds4x0_quality_list, dyesub_stringitem_t, dnp_ds4x0_qualities);
+
+static int
+dnp_ds4x0_load_parameters(const stp_vars_t *v, const char *name,
+			  stp_parameter_t *description)
+{
+  int	i;
+  const dyesub_cap_t *caps = dyesub_get_model_capabilities(v,
+		  				stp_get_model_id(v));
+
+  if (caps->parameter_count && caps->parameters)
+    {
+      for (i = 0; i < caps->parameter_count; i++)
+        if (strcmp(name, caps->parameters[i].name) == 0)
+          {
+	    stp_fill_parameter_settings(description, &(caps->parameters[i]));
+	    break;
+          }
+    }
+
+  if (strcmp(name, "PrintSpeed") == 0)
+    {
+      description->bounds.str = stp_string_list_create();
+
+      const dyesub_stringlist_t *mlist = &dnp_ds4x0_quality_list;
+      for (i = 0; i < mlist->n_items; i++)
+        {
+	  const dyesub_stringitem_t *m = &(mlist->item[i]);
+	  stp_string_list_add_string(description->bounds.str,
+				       m->name, m->text); /* Do *not* want this translated, otherwise use gettext(m->text) */
+	}
+      description->deflt.str = stp_string_list_param(description->bounds.str, 0)->name;
+      description->is_active = 1;
+    }
+#ifdef MITSU70X_8BPP
+  else if (strcmp(name, "UseLUT") == 0)
+    {
+      description->is_active = 1;
+    }
+  else if (strcmp(name, "Sharpen") == 0)
+    {
+      description->deflt.integer = 0;
+      description->bounds.integer.lower = 0;
+      description->bounds.integer.upper = 9;
+      description->is_active = 1;
+    }
+#endif
+  else
+  {
+     return 0;
+  }
+  return 1;
+}
+
+/* DNP DS680 */
+
+static const dyesub_pagesize_t dnp_ds680_page[] =
+{
+  DEFINE_PAPER_SIMPLE("w288h432", "4x6", PT1(1228,300), PT1(1864,300), DYESUB_LANDSCAPE),
+  DEFINE_PAPER_SIMPLE("w360h504", "5x7", PT1(1568,300), PT1(2128,300), DYESUB_PORTRAIT),
+  DEFINE_PAPER_SIMPLE("w432h576", "6x8", PT1(1864,300), PT1(2422,300), DYESUB_PORTRAIT),
+  DEFINE_PAPER_SIMPLE("w432h576-div2", "4x6*2", PT1(1864,300), PT1(2730,300), DYESUB_PORTRAIT),
+};
+
+LIST(dyesub_pagesize_list_t, dnp_ds680_page_list, dyesub_pagesize_t, dnp_ds680_page);
+
+static const dyesub_printsize_t dnp_ds680_printsize[] =
+{
+  { "300x300", "w288h432", 1228, 1864},
+  { "300x300", "w360h504", 1568, 2128},
+  { "300x300", "w432h576", 1864, 2422},
+  { "300x300", "w432h576-div2", 1864, 2730},
+};
+
+LIST(dyesub_printsize_list_t, dnp_ds680_printsize_list, dyesub_printsize_t, dnp_ds680_printsize);
 
 /* Kodak 305 */
 static const dyesub_pagesize_t kodak305_page[] =
@@ -11639,6 +11751,42 @@ static const dyesub_cap_t dyesub_model_capabilities[] =
     NULL, NULL,
     NULL, NULL,
     NULL, 0, NULL, NULL,
+  },
+  { /* DNP DS480 */
+    4119,
+    &bgr_ink_list,
+    &res_300dpi_list,
+    &dnp_ds480_page_list,
+    &dnp_ds480_printsize_list,
+    SHRT_MAX,
+    DYESUB_FEATURE_FULL_WIDTH | DYESUB_FEATURE_FULL_HEIGHT | DYESUB_FEATURE_PLANE_LEFTTORIGHT | DYESUB_FEATURE_NATIVECOPIES,
+    &dnp_ds4x0_printer_init, NULL,
+    NULL, NULL,
+    NULL, NULL, /* No block funcs */
+    &mitsu_cpd70x_overcoat_list, NULL,
+    NULL, NULL,
+    mitsu70x_parameters,
+    mitsu70x_parameter_count,
+    dnp_ds4x0_load_parameters,
+    mitsu70x_parse_parameters,
+  },
+  { /* DNP DS680 */
+    4120,
+    &bgr_ink_list,
+    &res_300dpi_list,
+    &dnp_ds680_page_list,
+    &dnp_ds680_printsize_list,
+    SHRT_MAX,
+    DYESUB_FEATURE_FULL_WIDTH | DYESUB_FEATURE_FULL_HEIGHT | DYESUB_FEATURE_PLANE_LEFTTORIGHT | DYESUB_FEATURE_NATIVECOPIES,
+    &dnp_ds4x0_printer_init, NULL,
+    NULL, NULL,
+    NULL, NULL, /* No block funcs */
+    &mitsu_cpd70x_overcoat_list, NULL,
+    NULL, NULL,
+    mitsu70x_parameters,
+    mitsu70x_parameter_count,
+    dnp_ds4x0_load_parameters,
+    mitsu70x_parse_parameters,
   },
   { /* Shinko CHC-S9045 (experimental) */
     5000,
