@@ -968,7 +968,9 @@ compare_names(const void *n1, const void *n2)
 void
 stpi_find_duplicate_printers(void)
 {
-  size_t nelts = stp_list_get_length(printer_list);
+  size_t nelts = stp_printer_model_count();
+  if (nelts == 0)
+    return;
   const char **str_data = stp_zalloc(sizeof(const char *) * nelts);
   stp_list_item_t *printer_item = stp_list_get_start(printer_list);
   size_t i = 0;
