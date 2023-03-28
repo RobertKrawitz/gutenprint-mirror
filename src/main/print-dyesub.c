@@ -2979,8 +2979,12 @@ static const dyesub_pagesize_t kodak_605_page[] =
   DEFINE_PAPER_SIMPLE( "w144h432", "2x6", PT1(636,300), PT1(1844,300),	DYESUB_LANDSCAPE), /* 2x6 */
   DEFINE_PAPER_SIMPLE( "w216h432", "3x6", PT1(936,300), PT1(1844,300),	DYESUB_LANDSCAPE), /* 3x6 */
   DEFINE_PAPER_SIMPLE( "w288h432", "4x6", PT1(1240,300), PT1(1844,300), DYESUB_LANDSCAPE), /* 4x6 */
+  DEFINE_PAPER_SIMPLE( "w288h432-div2", "4x6-div2", PT1(1282,300), PT1(1844,300), DYESUB_LANDSCAPE), /* 4x6-div2 */
   DEFINE_PAPER_SIMPLE( "w360h504", "5x7", PT1(1500,300), PT1(2100,300), DYESUB_PORTRAIT), /* 5x7 */
+  DEFINE_PAPER_SIMPLE( "w432h432", "6x6", PT1(1836,300), PT1(1844,300), DYESUB_LANDSCAPE),
+  DEFINE_PAPER_SIMPLE( "w432h432-div2", "6x6-div2", PT1(1844,300), PT1(1882,300), DYESUB_PORTRAIT),
   DEFINE_PAPER_SIMPLE( "w432h576", "6x8", PT1(1844,300), PT1(2434,300), DYESUB_PORTRAIT), /* 6x8 */
+  DEFINE_PAPER_SIMPLE( "w432h576-div2", "4x6 *2", PT1(1844,300), PT1(2490,300), DYESUB_PORTRAIT), /* 6x8-div2 */
 };
 
 LIST(dyesub_pagesize_list_t, kodak_605_page_list, dyesub_pagesize_t, kodak_605_page);
@@ -2990,8 +2994,12 @@ static const dyesub_printsize_t kodak_605_printsize[] =
   { "300x300", "w144h432", 636, 1844},
   { "300x300", "w216h432", 936, 1844},
   { "300x300", "w288h432", 1240, 1844},
+  { "300x300", "w288h432-div2", 1282, 1844},
+  { "300x300", "w432h432", 1836, 1844},
+  { "300x300", "w432h432-div2", 1844, 1836},
   { "300x300", "w360h504", 1500, 2100},
   { "300x300", "w432h576", 1844, 2434},
+  { "300x300", "w432h576-div2", 1844, 2490},
 };
 
 LIST(dyesub_printsize_list_t, kodak_605_printsize_list, dyesub_printsize_t, kodak_605_printsize);
@@ -3011,8 +3019,16 @@ static void kodak_605_printer_init(stp_vars_t *v)
 	  stp_putc(0x14, v);
   else if (!strcmp(pd->pagesize,"w288h432"))
 	  stp_putc(0x01, v);
+  else if (!strcmp(pd->pagesize,"w288h432-div2"))
+	  stp_putc(0x11, v);
+  else if (!strcmp(pd->pagesize,"w432h432"))
+	  stp_putc(0x0d, v);
+  else if (!strcmp(pd->pagesize,"w432h432-div2"))
+	  stp_putc(0x13, v);
   else if (!strcmp(pd->pagesize,"w432h576"))
 	  stp_putc(0x03, v);
+  else if (!strcmp(pd->pagesize,"w432h576-div2"))
+	  stp_putc(0x04, v);
   else if (!strcmp(pd->pagesize,"w360h504"))
 	  stp_putc(0x02, v);
   else

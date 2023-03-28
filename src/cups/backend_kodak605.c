@@ -1,7 +1,7 @@
 /*
  *   Kodak 605 Photo Printer CUPS backend -- libusb-1.0 version
  *
- *   (c) 2013-2021 Solomon Peachy <pizza@shaftnet.org>
+ *   (c) 2013-2023 Solomon Peachy <pizza@shaftnet.org>
  *
  *   The latest version of this program can be found at:
  *
@@ -143,8 +143,60 @@ struct kodak605_ctx {
 	struct marker marker;
 };
 
-/* Note this is for Kodak 7000-series only! */
-static const char *error_codes(uint8_t major, uint8_t minor)
+static const char *error_codes_605(uint8_t major, uint8_t minor)
+{
+	switch(major) {
+	case 0x01: /* "Controller Error" */
+		switch(minor) {
+		case 0x0c:
+		default:
+			return "Controller: Unknown";
+		}
+	case 0x02: /* "Mechanical Error" */
+		switch (minor) {
+		default:
+			return "Mechanical: Unknown";
+		}
+	case 0x03: /* "Sensor Error" */
+		switch (minor) {
+		default:
+			return "Sensor: Unknown";
+		}
+	case 0x04: /* "Temperature Sensor Error" */
+		switch (minor) {
+		default:
+			return "Temp Sensor: Unknown";
+		}
+	case 0x5: /* "Paper Jam" */
+		switch (minor) {
+		case 0x0c:
+		case 0x17:
+		case 0x2e:
+		case 0x52:
+		case 0x53:
+		default:
+			return "Paper Jam: Unknown";
+		}
+	case 0x06: /* User Error */
+		switch (minor) {
+		case 0x01:
+			return "Top Cover Open";
+		case 0x02:
+			return "Paper Cover Open";
+		case 0x05:
+			return "Ribbon Empty";
+		case 0x08:
+			return "Paper Empty";
+		default:
+			return "User: Unknown";
+		}
+	default:
+		return "Unknown";
+	}
+}
+
+
+static const char *error_codes_7000(uint8_t major, uint8_t minor)
 {
 	switch(major) {
 	case 0x01: /* "Controller Error" */
@@ -363,9 +415,10 @@ static int kodak605_attach(void *vctx, struct dyesub_connection *conn, uint8_t j
 	struct kodak605_ctx *ctx = vctx;
 
 	ctx->dev.conn = conn;
-	ctx->dev.error_codes = &error_codes;
+	ctx->dev.error_codes = error_codes_605;
 
 	if (ctx->dev.conn->type != P_KODAK_605) {
+		ctx->dev.error_codes = &error_codes_7000;
 		ctx->dev.params = ek7000_params;
 		ctx->dev.params_count = ek7000_params_num;
 	}
@@ -481,7 +534,7 @@ static int kodak605_main_loop(void *vctx, const void *vjob, int wait_for_return)
 			      sts.hdr.result, sts.hdr.error,
 			      sinfonia_error_str(sts.hdr.error),
 			      sts.hdr.printer_major, sts.hdr.printer_minor,
-			      error_codes(sts.hdr.printer_major, sts.hdr.printer_minor));
+			      ctx->dev.error_codes(sts.hdr.printer_major, sts.hdr.printer_minor));
 			return CUPS_BACKEND_FAILED;
 		}
 
@@ -590,7 +643,7 @@ retry_print:
 			ERROR("Result: %02x Error: %02x (%02x %02x = %s)\n",
 			      sts.hdr.result, sts.hdr.error,
 			      sts.hdr.printer_major, sts.hdr.printer_minor,
-			      error_codes(sts.hdr.printer_major, sts.hdr.printer_minor));
+			      ctx->dev.error_codes(sts.hdr.printer_major, sts.hdr.printer_minor));
 
 			return CUPS_BACKEND_FAILED;
 		}
@@ -621,7 +674,7 @@ retry_print:
 			     sts.hdr.result, sts.hdr.error,
 			     sinfonia_error_str(sts.hdr.error),
 			     sts.hdr.printer_major, sts.hdr.printer_minor,
-			     error_codes(sts.hdr.printer_major, sts.hdr.printer_minor));
+			     ctx->dev.error_codes(sts.hdr.printer_major, sts.hdr.printer_minor));
 			return CUPS_BACKEND_STOP;
 		}
 
@@ -655,7 +708,7 @@ static void kodak605_dump_status(struct kodak605_ctx *ctx, struct kodak605_statu
 	INFO("Error: %02x (%s) %02x/%02x = %s\n",
 	     sts->hdr.error, sinfonia_error_str(sts->hdr.error),
 	     sts->hdr.printer_major, sts->hdr.printer_minor,
-	     error_codes(sts->hdr.printer_major, sts->hdr.printer_minor));
+	     ctx->dev.error_codes(sts->hdr.printer_major, sts->hdr.printer_minor));
 
 	INFO("Bank 1: %s - Job %03u @ %03u/%03u\n",
 	     sinfonia_bank_statuses(sts->b1_sts), sts->b1_id,
@@ -699,7 +752,7 @@ static void kodak605_dump_mediainfo(struct kodak605_media_list *media)
 
 	DEBUG("Legal print sizes:\n");
 	for (i = 0 ; i < media->count ; i++) {
-		DEBUG("\t%d: %ux%u (%x)\n", i,
+		DEBUG("\t%d: %ux%u (%02x)\n", i,
 		      media->entries[i].columns,
 		      media->entries[i].rows,
 		      media->entries[i].code);
@@ -895,7 +948,7 @@ static const char *kodak605_prefixes[] = {
 /* Exported */
 const struct dyesub_backend kodak605_backend = {
 	.name = "Kodak 605/70xx",
-	.version = "0.56" " (lib " LIBSINFONIA_VER ")",
+	.version = "0.57" " (lib " LIBSINFONIA_VER ")",
 	.uri_prefixes = kodak605_prefixes,
 	.cmdline_usage = kodak605_cmdline,
 	.cmdline_arg = kodak605_cmdline_arg,
