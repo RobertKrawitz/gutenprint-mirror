@@ -119,6 +119,7 @@
       <printer translate="name" name="Fujifilm FinePix-NX-500" driver="fujifilm-nx500" manufacturer="Fujifilm" model="3002" />
       <printer translate="name" name="Fujifilm Printpix-CX-400" driver="fujifilm-cx400" manufacturer="Fujifilm" model="3000" />
       <printer translate="name" name="Fujifilm Printpix-CX-550" driver="fujifilm-cx550" manufacturer="Fujifilm" model="3001" />
+      <printer translate="name" name="HiTi Prinhome P461" deviceid="MFG:HiTi;CMD:???;MDL:Prinhome P461;CLS:PRINTER;" driver="hiti-p461" manufacturer="HiTi" model="6503">EXPERIMENTAL</printer>
       <printer translate="name" name="HiTi P510K" deviceid="MFG:HiTi;MDL:HiTi P510K;CLS:PRINTER;" driver="hiti-p510k" manufacturer="HiTi" model="6502">EXPERIMENTAL</printer>
       <printer translate="name" name="HiTi P510L" deviceid="MFG:HiTi;MDL:HiTi P510L;CLS:PRINTER;" driver="hiti-p510l" manufacturer="HiTi" model="6502">EXPERIMENTAL</printer>
       <printer translate="name" name="HiTi P510S" deviceid="MFG:HiTi;MDL:HiTi P510S;CLS:PRINTER;" driver="hiti-p510s" manufacturer="HiTi" model="6502">EXPERIMENTAL</printer>

@@ -9406,6 +9406,26 @@ static void hiti_p510l_printer_start(stp_vars_t *v)
   hiti_printer_start(v, 510);
 }
 
+/* HiTi P461 series */
+static const dyesub_pagesize_t hiti_p461_page[] =
+{
+  DEFINE_PAPER_SIMPLE( "w288h432", "4x6", PT1(1280,300), PT1(1818,300), DYESUB_PORTRAIT),
+};
+
+LIST(dyesub_pagesize_list_t, hiti_p461_page_list, dyesub_pagesize_t, hiti_p461_page);
+
+static const dyesub_printsize_t hiti_p461_printsize[] =
+{
+    { "300x300", "w288h432", 1280, 1818},
+};
+
+LIST(dyesub_printsize_list_t, hiti_p461_printsize_list, dyesub_printsize_t, hiti_p461_printsize);
+
+static void hiti_p461_printer_start(stp_vars_t *v)
+{
+  hiti_printer_start(v, 461);
+}
+
 /* Magicard Series */
 static const dyesub_pagesize_t magicard_page[] =
 {
@@ -11549,7 +11569,25 @@ static const dyesub_cap_t dyesub_model_capabilities[] =
     hiti_p720l_load_parameters,
     hiti_p720l_parse_parameters,
   },
-
+  { /* HiTi P461 Prinhome */
+    6503,
+    &bgr_ink_list,
+    &res_300dpi_list,
+    &hiti_p461_page_list,
+    &hiti_p461_printsize_list,
+    SHRT_MAX,
+    DYESUB_FEATURE_FULL_WIDTH | DYESUB_FEATURE_FULL_HEIGHT
+      | DYESUB_FEATURE_NATIVECOPIES | DYESUB_FEATURE_HASBACKEND,
+    &hiti_p461_printer_start, NULL,
+    NULL, NULL,
+    NULL, NULL,
+    &hiti_p520l_overcoat_list, NULL,
+    NULL, NULL,
+    hiti_p720l_parameters,
+    hiti_p720l_parameter_count,
+    hiti_p720l_load_parameters,
+    hiti_p720l_parse_parameters,
+  },
   { /* Magicard Series w/ Duplex */
     7000,
     &ymc_ink_list,

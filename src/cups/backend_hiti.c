@@ -45,15 +45,24 @@ struct hiti_cmd {
 	uint8_t payload[];  /* 0-3 items */
 } __attribute__((packed));
 
-#define CMD_STATUS_OK      0x50
-#define CMD_STATUS_OK2     0x51 /* Seen with ERDC_RLC on p51x */
-#define CMD_STATUS_OK3     0x53 /* Seen with EPC_SP on p51x, sometimes? */
-#define CMD_STATUS_BAD_CMD 0xd8 /* eg seen with EFM_RD on p51x, EFD_CHS on p525 */
-#define CMD_STATUS_UNK2    0xdb /* Seen with ESD_SEHT2 on p51x */
+#define CMD_STATUS_ERR     0x80
+#define CMD_STATUS_OK      (0x40 | 0x10)
+
+// XXX lower 4 bits are sub-status, unknown.
+
+// Success
+// 0x01 Seen with ERDC_RLC on p51x
+// 0x02 Seen with EPC_SP on p51x, sometimes?
+// 0x03 Seen with RDC_RS on p461
+
+// Errors
+// 0x08 Seen with EFM_RD on p51x, EFD_CHS on p6525
+// 0x0a Seen with ERDC_RRVC on p461 (due to no ribbon?)
+// 0x0b Seen with ESD_SEHT2 on p51x
 
 /* Request Device Characteristics */
 #define CMD_RDC_RS     0x0100 /* Request Summary */
-#define CMD_RDC_ROC    0x0104 /* Request Option Characteristics XX (1 resp, not p51x) */
+#define CMD_RDC_ROC    0x0104 /* Request Option Characteristics (1 resp on p52x, not on p51x, 16 on p461 */
 
 /* Printer Configuratio Control */
 #define CMD_PCC_RP     0x0301 /* Reset Printer (1 arg) */
@@ -74,7 +83,7 @@ struct hiti_cmd {
 /* Job Control */
 #define CMD_JC_SJ      0x0500 /* Start Job (3 arg) */
 #define CMD_JC_EJ      0x0501 /* End Job (3 arg) */
-#define CMD_JC_QJC     0x0502 /* Query Job Completed (5 arg) XX 6 byte resp */
+#define CMD_JC_QJC     0x0502 /* Query Job Completed (5 arg) XX 6 byte resp (most), 2 (p461) */
 #define CMD_JC_QQA     0x0503 /* Query Jobs Queued or Active (3 arg) */
 #define CMD_JC_RSJ     0x0510 /* Resume Suspended Job (3 arg) XX */
 
@@ -82,10 +91,10 @@ struct hiti_cmd {
 #define CMD_ERDC_RS    0x8000 /* Request Summary */
 #define CMD_ERDC_RCC   0x8001 /* Read Calibration Charcteristics */
 #define CMD_ERDC_RPC   0x8005 /* Request Print Count (1 arg, 8 (51x) or 4 (52x,7xx) resp) */
-#define CMD_ERDC_RLC   0x8006 /* Request LED calibration */
+#define CMD_ERDC_RLC   0x8006 /* Request LED calibration (10 on 52x, 6 on 461 */
 #define CMD_ERDC_RSN   0x8007 /* Read Serial Number (1 arg) */
 #define CMD_ERDC_C_RPCS 0x8008 /* CS Request Printer Correction Status */
-#define CMD_ERDC_CTV   0x8008 /* Color Table Version XXX p51x, string (14 byte reply?) */
+#define CMD_ERDC_CTV   0x8008 /* Color Table Version XXX p51x, string (14 byte reply?), error on p461 */
 #define CMD_ERDC_RPIDM 0x8009 /* Request PID and Model Code */
 #define CMD_ERDC_RTLV  0x800E /* Request T/L Voltage */
 #define CMD_ERDC_RRVC  0x800F /* Read Ribbon Vendor Code */
@@ -130,7 +139,7 @@ struct hiti_cmd {
 #define CMD_ESD_SEHT   0x8304 /* Send Ext Heating Table XX */
 #define CMD_ESD_SEPD   0x8309 /* Send Ext Print Data (2 arg) + struct */
 #define CMD_ESD_UNK    0x830A /* Unknown, seen on P51x (4 byte payload) */
-#define CMD_ESD_SHPTC  0x830B /* Send Heating Parameters & Tone Curve XX (n arg) */
+#define CMD_ESD_SHPTC  0x830B /* Send Heating Parameters & Tone Curve XX (4167 byte payload on p461) */
 #define CMD_ESD_C_SHPTC  0x830C /* CS Send Heating Parameters & Tone Curve XX (n arg) */
 
 /* Extended Flash/NVram */
@@ -180,13 +189,14 @@ struct hiti_rpidm {
 /* CMD_EDRC_RS */
 struct hiti_erdc_rs {      /* All are BIG endian */
 	uint8_t  unk;      // 1e == 30, but struct is 29 length.
-	uint16_t stride;   /* fixed at 0x0780/1920? Head width? */
+	uint16_t stride;   /* Head width: 1920 (6" models) 1280 (4" models) */
 	uint16_t dpi_cols; /* fixed at 300 */
 	uint16_t dpi_rows; /* fixed at 300 */
 	uint16_t cols;     /* 1844 for 6" media */
 	uint16_t rows;     /* 1240 for 6x4" media */
 	uint8_t  unk2[18];  // ff ff 4b 4b 4b 4b  af 3c 4f 7b 19 08  5c 0a b4 64 af af (p520l)
 	                    // 55 a0 96 96 96 96  d2 78 0e 3f 6e 08  5c 09 82 40 d2 a0 (p510s)
+	                    // ff ff 0f 0f 0f 0f  7d 14 4f 7b 20 00  00 00 00 20 7d 64 (p461)
 } __attribute__((packed));
 
 /* CMD_JC_* */
@@ -218,18 +228,22 @@ struct hiti_jc_qjc {
 } __attribute__((packed));
 // repsonse is 6 bytes.
 
-//. 5x3.5 1547 1072
-//. 6x4   1844 1240
-//. 6x9   1844 2740
-//. 6x8/2 1844 2492
-//. 6x8   1844 2434
-//. 5x7   1548 2140
-//. 5x7/2 1548 2152
-//. 6x4/2 1844 1248
+// Roll Type:
+// 5x3.5 1547 1072
+// 6x4   1844 1240
+// 6x9   1844 2740
+// 6x8/2 1844 2492
+// 6x8   1844 2434
+// 5x7   1548 2140
+// 5x7/2 1548 2152
+// 6x4/2 1844 1248
 // 6x6    1844 1844
 // 5x5    1540 1540 ? (1548?)
 // 6x5    1844 1544
 // 6x2    1844 ????
+
+// Sheet type:
+// 6x4    1818 1280
 
 #define PRINT_TYPE_6x4      0
 #define PRINT_TYPE_5x7      2
@@ -296,6 +310,8 @@ struct hiti_heattable_hdr_v2 {
 
 #define HEATTABLE_V2_MAX_SIZE (1024*128)
 
+#define HEATTABLE_S_SIZE 4167
+
 /* All fields are LE */
 struct hiti_gpjobhdr {
 	uint32_t cookie;  /* "GPHT" */
@@ -330,6 +346,7 @@ struct hiti_efd_sf {
 /*@11*/	uint8_t  colorSeq;  /* always 0x87, but |= 0xc0 for matte. */
 /*@12*/	uint8_t  copies;
 /*@13*/	uint8_t  printMode; /* 0x08 baseline, |= 0x02 fine mode */
+/*@14*/	uint8_t  zero[4]; /* P461 only */
 } __attribute__((packed));
 
 /* CMD_ESD_SEPD -- Note it's different from the usual command flow */
@@ -419,9 +436,9 @@ struct hiti_matrix {
 STATIC_ASSERT(sizeof(struct hiti_matrix) == 512);
 
 struct hiti_ribbon {
-	uint16_t unk;
+	uint16_t unk;  // 01 08 (p461)
 	uint8_t type;  /* RIBBON_TYPE_XXX */
-	uint16_t unk2;
+	uint16_t unk2; // 00 07 (p461)
 } __attribute__((packed));
 
 #define RIBBON_TYPE_4x6    0x01
@@ -435,6 +452,7 @@ struct hiti_paper {
 	uint16_t unk2;
 } __attribute__((packed));
 
+#define PAPER_TYPE_X4INCH  0xf0  // XXX hack
 #define PAPER_TYPE_5INCH   0x02
 #define PAPER_TYPE_6INCH   0x01
 #define PAPER_TYPE_NONE    0x00
@@ -549,8 +567,7 @@ static int hiti_docmd(struct hiti_ctx *ctx, uint16_t cmdid, uint8_t *buf, uint16
 	}
 
 	/* Check response */
-	if (cmd->status != CMD_STATUS_OK && cmd->status != CMD_STATUS_OK2 &&
-	    cmd->status != CMD_STATUS_OK3) {
+	if (cmd->status & CMD_STATUS_ERR) {
 		ERROR("Command %04x failed, code %02x\n", cmdid, cmd->status);
 		return CUPS_BACKEND_FAILED;
 	}
@@ -598,6 +615,41 @@ static int hiti_docmd_resp(struct hiti_ctx *ctx, uint16_t cmdid,
 	}
 
 	*resplen = total;
+
+	return CUPS_BACKEND_OK;
+}
+
+static int hiti_shptc(struct hiti_ctx *ctx, uint8_t *buf, uint16_t buf_len)
+{
+	uint8_t cmdbuf[sizeof(struct hiti_cmd)];
+	struct hiti_cmd *cmd = (struct hiti_cmd *)cmdbuf;
+	int ret, num = 0;
+
+	cmd->hdr = 0xa5;
+	cmd->len = cpu_to_be16(buf_len + 3);
+	cmd->status = CMD_STATUS_OK;
+	cmd->cmd = cpu_to_be16(CMD_ESD_SHPTC);
+
+	/* Send over command */
+	if ((ret = send_data(ctx->conn, (uint8_t*) cmd, sizeof(*cmd)))) {
+		return ret;
+	}
+
+	__usleep(10*1000);
+
+	/* Read back command */
+	ret = read_data(ctx->conn, cmdbuf, 6, &num);
+	if (ret)
+		return ret;
+
+	if (num != 6) {
+		ERROR("CMD Readback length mismatch (%d vs %d)!\n", num, 6);
+		return CUPS_BACKEND_FAILED;
+	}
+
+	ret = send_data(ctx->conn, buf, buf_len);
+	if (ret)
+		return CUPS_BACKEND_FAILED;
 
 	return CUPS_BACKEND_OK;
 }
@@ -697,15 +749,26 @@ static const char* hiti_ribbontypes(uint8_t code)
 	}
 }
 
-static unsigned int hiti_ribboncounts(uint8_t code)
+static unsigned int hiti_ribboncounts(uint8_t code, uint8_t type)
 {
-	switch(code) {
-	case RIBBON_TYPE_4x6: return 500;
-	case RIBBON_TYPE_5x7: return 290;
-	case RIBBON_TYPE_6x8: return 250;
-	case RIBBON_TYPE_6x9: return 220; // XXX guess
-	default: return 999;
+	if (type == P_HITI_461) {
+		switch(code) {
+		case RIBBON_TYPE_4x6: return 60;
+		default: return 999;
+		}
 	}
+
+	if (type == P_HITI_520 || type == P_HITI_525 || type == P_HITI_530) {
+		switch(code) {
+		case RIBBON_TYPE_4x6: return 500;
+		case RIBBON_TYPE_5x7: return 290;
+		case RIBBON_TYPE_6x8: return 250;
+		case RIBBON_TYPE_6x9: return 220; // XXX guess
+		default: return 999;
+		}
+	}
+
+	return 999;
 }
 
 static const char* hiti_papers(uint8_t code)
@@ -714,6 +777,7 @@ static const char* hiti_papers(uint8_t code)
 	case PAPER_TYPE_NONE : return "None";
 	case PAPER_TYPE_5INCH: return "5 inch";
 	case PAPER_TYPE_6INCH: return "6 inch";
+	case PAPER_TYPE_X4INCH: return "4x6 sheet";
 	default: return "Unknown";
 	}
 }
@@ -775,7 +839,7 @@ static const char *hiti_errors(uint32_t code)
 	case 0x00031201: return "NAND flash error";
 	case 0x00031302: return "Cutter error";
 		/* Operator Intervention Required Alerts */
-	case 0x00050001: return "Cover open";
+	case 0x00050001: return "Cover open";  // XXX or no ribbon loaded on P461?
 	case 0x00050101: return "Cover open";
 		/* Supplies Alerts */
 	case 0x00080004: return "Ribbon missing";
@@ -856,6 +920,33 @@ static const char *hiti_errors(uint32_t code)
 	}
 }
 
+static int hiti_dump_options(struct hiti_ctx *ctx)
+{
+	int ret;
+	uint8_t buf[256];
+	uint16_t len = 256;
+	int i;
+	uint8_t *ptr;
+
+	ret = hiti_docmd_resp(ctx, CMD_RDC_ROC, NULL, 0,
+			      buf, &len);
+	if (ret)
+		return ret;
+
+	ptr = buf;
+	while (len > 0 && *ptr) {
+		i = ptr[ptr[1]+2];
+		ptr[ptr[1]+2] = 0;
+		INFO("Option %02x: '%s'\n", *ptr, ptr+2);
+		len -= ptr[1] + 2;
+		ptr += ptr[1] + 2;
+		*ptr = i;
+	}
+
+
+	return CUPS_BACKEND_OK;
+}
+
 static int hiti_get_info(struct hiti_ctx *ctx)
 {
 	int ret;
@@ -870,6 +961,12 @@ static int hiti_get_info(struct hiti_ctx *ctx)
 	INFO("Printer ID: %s\n", ctx->id);
 	INFO("Printer Version: %s\n", ctx->version);
 	INFO("Serial Number: %s\n", ctx->serno);
+
+	if (ctx->conn->type != P_HITI_51X) {
+		ret = hiti_dump_options(ctx);
+		if (ret)
+			return ret;
+	}
 
 	INFO("Calibration:  H: %d V: %d\n", ctx->calibration.horiz, ctx->calibration.vert);
 	INFO("LED Calibration: %d %d %d / %d %d %d\n",
@@ -886,10 +983,6 @@ static int hiti_get_info(struct hiti_ctx *ctx)
 		INFO("Highlight Adjustment (Y M C): %d %d %d\n",
 		     ctx->hilight_adj[1], ctx->hilight_adj[2], ctx->hilight_adj[3]);
 	}
-
-	ret = hiti_query_summary(ctx, &ctx->erdc_rs);
-	if (ret)
-		return CUPS_BACKEND_FAILED;
 
 	INFO("Status Summary: %d %dx%d %dx%d\n",
 	     ctx->erdc_rs.stride,
@@ -968,6 +1061,10 @@ static int hiti_get_status(struct hiti_ctx *ctx)
 	if (ret)
 		return ret;
 
+	INFO("Printer ID: %s\n", ctx->id);
+	INFO("Printer Version: %s\n", ctx->version);
+	INFO("Serial Number: %s\n", ctx->serno);
+
 	INFO("Printer Status: %s (%02x %02x %02x)\n",
 	     hiti_status(sts), sts[0], sts[1], sts[2]);
 	INFO("Printer Error: %s (%08x)\n",
@@ -977,7 +1074,7 @@ static int hiti_get_status(struct hiti_ctx *ctx)
 	     hiti_ribbontypes(ctx->ribbon.type),
 	     ctx->ribbon.type,
 	     ctx->ribbonvendor,
-	     ctx->media_remain, hiti_ribboncounts(ctx->ribbon.type));
+	     ctx->media_remain, hiti_ribboncounts(ctx->ribbon.type, ctx->conn->type));
 	INFO("Paper: %s (%02x)\n",
 	     hiti_papers(ctx->paper.type),
 	     ctx->paper.type);
@@ -1037,9 +1134,11 @@ static int hiti_attach(void *vctx, struct dyesub_connection *conn, uint8_t jobid
 		if (ctx->conn->type == P_HITI_520)
 			libusb_reset_device(ctx->conn->dev);
 
-		ret = hiti_query_unk8010(ctx);
-		if (ret)
-			return ret;
+		if (ctx->conn->type != P_HITI_461) {
+			ret = hiti_query_unk8010(ctx);
+			if (ret)
+				return ret;
+		}
 		ret = hiti_query_version(ctx);
 		if (ret)
 			return ret;
@@ -1049,14 +1148,19 @@ static int hiti_attach(void *vctx, struct dyesub_connection *conn, uint8_t jobid
 		ret = hiti_query_calibration(ctx);
 		if (ret)
 			return ret;
-		ret = hiti_query_ribbonvendor(ctx);
-		if (ret)
-			return ret;
+		if (ctx->conn->type == P_HITI_461) {
+			// XXX do something here for ribbonvendor
+			ctx->paper.type = PAPER_TYPE_X4INCH;
+		} else {
+			ret = hiti_query_ribbonvendor(ctx);
+			if (ret)
+				return ret;
+		}
 		ret = hiti_query_rpidm(ctx);
 		if (ret)
 			return ret;
 
-		if (ctx->conn->type != P_HITI_51X) {
+		if (ctx->conn->type != P_HITI_51X && ctx->conn->type != P_HITI_461) {
 			ret = hiti_query_hilightadj(ctx);
 			if (ret)
 				return ret;
@@ -1066,7 +1170,15 @@ static int hiti_attach(void *vctx, struct dyesub_connection *conn, uint8_t jobid
 		if (ret)
 			return ret;
 
+		ret = hiti_query_summary(ctx, &ctx->erdc_rs);
+		if (ret)
+			return CUPS_BACKEND_FAILED;
+
 		switch (ctx->conn->type) {
+		case P_HITI_461:
+			if (strncmp(ctx->version, "1.12.0", 8) < 0)
+				WARNING("Printer firmware %s out of date (vs %s), please update.\n", ctx->version, "v1.12.0");
+			break;
 		case P_HITI_520:
 			if (strncmp(ctx->version, "1.22", 4) < 0 &&
 			    strncmp(ctx->version, "1.17", 4) > 0)  /* V1.18 -> v1.21 have a known USB CLEAR_ENDPOINT_HALT issue */
@@ -1083,10 +1195,13 @@ static int hiti_attach(void *vctx, struct dyesub_connection *conn, uint8_t jobid
 		}
 		// do real stuff
 	} else {
-		ctx->paper.type = PAPER_TYPE_6INCH;
+		if (ctx->conn->type == P_HITI_461)
+			ctx->paper.type = PAPER_TYPE_X4INCH;
+		else
+			ctx->paper.type = PAPER_TYPE_6INCH;
 		ctx->ribbon.type = RIBBON_TYPE_4x6;
 
-		if (getenv("MEDIA_CODE")) {
+		if (getenv("MEDIA_CODE") && strlen(getenv("MEDIA_CODE"))) {
 			// set fake fw version?
 			ctx->ribbon.type = atoi(getenv("MEDIA_CODE"));
 			if (ctx->ribbon.type == RIBBON_TYPE_5x7)
@@ -1096,9 +1211,13 @@ static int hiti_attach(void *vctx, struct dyesub_connection *conn, uint8_t jobid
 
 	ctx->marker.color = "#00FFFF#FF00FF#FFFF00";
 	ctx->marker.name = hiti_ribbontypes(ctx->ribbon.type);
-	ctx->marker.numtype = ctx->ribbon.type;
-	ctx->marker.levelmax = hiti_ribboncounts(ctx->ribbon.type);
+	ctx->marker.levelmax = hiti_ribboncounts(ctx->ribbon.type, ctx->conn->type);
 	ctx->marker.levelnow = 0;
+
+	if (ctx->conn->type == P_HITI_461)
+		ctx->marker.numtype = -1;
+	else
+		ctx->marker.numtype = ctx->ribbon.type;
 
 	return CUPS_BACKEND_OK;
 }
@@ -1123,13 +1242,40 @@ static uint8_t *hiti_get_correction_data(struct hiti_ctx *ctx, uint8_t mode)
 	int mediaver = ctx->ribbonvendor & 0x3f;
 	int mediatype = ctx->ribbonvendor & 0xf000;
 
-	DEBUG("Locating correction data for model %d, mode %02x, media %02x, ver %02x\n",
-	      ctx->conn->type, mode, mediatype >> 2, mediaver);
-
 	switch (ctx->conn->type)
 	{
 	case P_HITI_CS2XX:
 		fname = "CS2xx_CMPBcd.bin";
+		// XXX there are a _lot_ more.
+		break;
+	case P_HITI_461:
+		if (mediatype == 0x1000) { /* CHC media */
+			if (mode) {
+				// what mode does 'P' mean?
+				switch(mediaver) {
+				case 0:
+					fname = "P461_CCQPsn.bin";
+					break;
+				case 1:
+				default:
+					fname = "P461_CCQP1sn.bin";
+					break;
+				}
+			} else {
+				switch(mediaver) {
+				case 0:
+					fname = "P461_CCPPsn.bin";
+					break;
+				case 1:
+				default:
+					fname = "P461_CCPP1sn.bin";
+					break;
+				}
+			}
+		} else { /* DNP media */
+		// XXX CCPCL CCQCL <-- ???
+
+		}
 		break;
 	case P_HITI_51X:
 		if (mediatype == 0x1000) { /* CHC media */
@@ -1148,8 +1294,20 @@ static uint8_t *hiti_get_correction_data(struct hiti_ctx *ctx, uint8_t mode)
 					fname = "P51x_CCQP3ra.bin";
 					break;
 				case 4:
-				default:
 					fname = "P51x_CCQP4ra.bin";
+					break;
+				case 6:
+					fname = "P51x_CCQP6ra.bin";
+					break;
+				case 7:
+					fname = "P51x_CCQP7ra.bin";
+					break;
+				case 8:
+					fname = "P51x_CCQP8ra.bin";
+					break;
+				case 9:
+				default:
+					fname = "P51x_CCQP9ra.bin";
 					break;
 				}
 			} else {
@@ -1170,8 +1328,20 @@ static uint8_t *hiti_get_correction_data(struct hiti_ctx *ctx, uint8_t mode)
 					fname = "P51x_CCPP4ra.bin";
 					break;
 				case 5:
-				default:
 					fname = "P51x_CCPP5ra.bin";
+					break;
+				case 6:
+					fname = "P51x_CCPP6ra.bin";
+					break;
+				case 7:
+					fname = "P51x_CCPP7ra.bin";
+					break;
+				case 8:
+					fname = "P51x_CCPP8ra.bin";
+					break;
+				case 9:
+				default:
+					fname = "P51x_CCPP9ra.bin";
 					break;
 				}
 			}
@@ -1186,6 +1356,7 @@ static uint8_t *hiti_get_correction_data(struct hiti_ctx *ctx, uint8_t mode)
 		}
 		break;
 	case P_HITI_520:
+		// XXX there's also CCPCL* and CCPIri
 		switch(mediaver) {
 		case 0:
 			fname = "P52x_CCPPri.bin";
@@ -1206,8 +1377,14 @@ static uint8_t *hiti_get_correction_data(struct hiti_ctx *ctx, uint8_t mode)
 			fname = "P52x_CCPP5ri.bin";
 			break;
 		case 6:
-		default:
 			fname = "P52x_CCPP6ri.bin";
+			break;
+		case 7:
+			fname = "P52x_CCPP7ri.bin";
+			break;
+		case 8:
+		default:
+			fname = "P52x_CCPP8ri.bin";
 			break;
 		}
 		break;
@@ -1233,20 +1410,27 @@ static uint8_t *hiti_get_correction_data(struct hiti_ctx *ctx, uint8_t mode)
 			fname = "P52x_CCPP5ri1.bin";
 			break;
 		case 6:
-		default:
 			fname = "P52x_CCPP6ri1.bin";
+			break;
+		case 7:
+			fname = "P52x_CCPP7ri1.bin";
+			break;
+		case 8:
+		default:
+			fname = "P52x_CCPP8ri1.bin";
 			break;
 		}
 		break;
 	case P_HITI_530:
 		fname = "P53x_CCPPrk.bin";
+		// XXX also CCPCLrk.bin
 		break;
 	case P_HITI_720:
 		if (mediatype == 0x1000) {
 			if (mode) {
 				switch(mediaver) {
 				case 0:
-					fname = "P72x_CCQPrd.bin";
+					fname = "P72x_CCQP0rd.bin";
 					break;
 				case 1:
 					fname = "P72x_CCQP1rd.bin";
@@ -1263,6 +1447,9 @@ static uint8_t *hiti_get_correction_data(struct hiti_ctx *ctx, uint8_t mode)
 				case 5:
 					fname = "P72x_CCQP5rd.bin";
 					break;
+				case 6:
+					fname = "P72x_CCQP6rd.bin";
+					break;
 				case 7:
 					fname = "P72x_CCQP7rd.bin";
 					break;
@@ -1270,8 +1457,13 @@ static uint8_t *hiti_get_correction_data(struct hiti_ctx *ctx, uint8_t mode)
 					fname = "P72x_CCQP8rd.bin";
 					break;
 				case 9:
-				default:
 					fname = "P72x_CCQP9rd.bin";
+					break;
+				case 10:
+					fname = "P72x_CCQPard.bin";
+					break;
+				default:
+					fname = "P72x_CCQPrd.bin";
 					break;
 				}
 			} else {
@@ -1341,6 +1533,10 @@ static uint8_t *hiti_get_correction_data(struct hiti_ctx *ctx, uint8_t mode)
 		fname = NULL;
 		break;
 	}
+
+	DEBUG("Locating correction data for model %d, mode %02x, media %02x, ver %02x = '%s'\n",
+	      ctx->conn->type, mode, mediatype >> 4, mediaver, fname);
+
 	if (!fname)
 		return NULL;
 
@@ -1449,9 +1645,36 @@ static const char* hiti_get_heat_file(struct hiti_ctx *ctx, uint8_t mode)
 	int mediaver = ctx->ribbonvendor & 0x3f;
 	int mediatype = ctx->ribbonvendor & 0xf000;
 
+	DEBUG("Locating heat data for model %d, mode %02x, media %02x, ver %02x\n",
+	      ctx->conn->type, mode, mediatype >> 4, mediaver);
+
 	// XXX if field_0x70 != 100) send blank/empty tables..
 	// no idea what sets this field.
 	switch (ctx->conn->type) {
+	case P_HITI_461:
+		if (mediatype == 0x1000) { /* CHC media */
+			if (mode) {
+				// what mode does 'P' mean?
+				switch(mediaver) {
+				case 0:
+					return "P461_heatqcsn.bin";
+				case 1:
+				default:
+					return "P461_hea1qcsn.bin";
+				}
+			} else {
+				switch(mediaver) {
+				case 0:
+					return "P461_heattcsn.bin";
+				case 1:
+				default:
+					return "P461_hea1tcsn.bin";
+				}
+			}
+		} else { /* DNP media */
+			return "P461_heatthsn.bin";
+		}
+		break;
 	case P_HITI_51X:
 		if (mediatype == 0x1000) { /* CHC media */
                         // what mode does 'P' (PC) match?
@@ -1467,6 +1690,14 @@ static const char* hiti_get_heat_file(struct hiti_ctx *ctx, uint8_t mode)
 					return "P51x_hea3qcra.bin";
 				case 4:
 					return "P51x_hea4qcra.bin";
+				case 6:
+					return "P51x_hea6qcra.bin";
+				case 7:
+					return "P51x_hea7qcra.bin";
+				case 8:
+					return "P51x_hea8qcra.bin";
+				case 9:
+					return "P51x_hea9qcra.bin";
 				default:
 					return "P51x_heatqcra.bin";
 				}
@@ -1484,6 +1715,14 @@ static const char* hiti_get_heat_file(struct hiti_ctx *ctx, uint8_t mode)
 					return "P51x_hea4tcra.bin";
 				case 5:
 					return "P51x_hea5tcra.bin";
+				case 6:
+					return "P51x_hea6tcra.bin";
+				case 7:
+					return "P51x_hea7tcra.bin";
+				case 8:
+					return "P51x_hea8tcra.bin";
+				case 9:
+					return "P51x_hea9tcra.bin";
 				default:
 					return "P51x_heattcra.bin";
 				}
@@ -1501,7 +1740,7 @@ static const char* hiti_get_heat_file(struct hiti_ctx *ctx, uint8_t mode)
 		if (mode) {
 			return "P53x_heatqcrk.bin";
 		} else {
-			return "P53x_heatpcrk.bin";
+			return "P53x_heattcrk.bin";
 		}
 	case P_HITI_720:
 		if (mediatype == 0x1000) { /* CHC media */
@@ -1514,12 +1753,18 @@ static const char* hiti_get_heat_file(struct hiti_ctx *ctx, uint8_t mode)
 					return "P72x_hea4qcrd.bin";
 				case 5:
 					return "P72x_hea5qcrd.bin";
+				case 6:
+					return "P72x_hea6qcrd.bin";
 				case 7:
 					return "P72x_hea7qcrd.bin";
 				case 8:
 					return "P72x_hea8qcrd.bin";
 				case 9:
 					return "P72x_hea9qcrd.bin";
+				case 10:
+					return "P72x_heaaqcrd.bin";
+				case 11:
+					return "P72x_heabqcrd.bin";
 				default:
 					return "P72x_heatqcrd.bin";
 				}
@@ -1534,7 +1779,8 @@ static const char* hiti_get_heat_file(struct hiti_ctx *ctx, uint8_t mode)
 				}
 			}
 		} else {
-			// what mode does 'P' (PH) match?
+			// XXX heatpdre / heattdre
+			// what mode does 'P' match?  and 'D' means what?
 			if (mode) {
 				return "P72x_heatqhrd.bin";
 			} else {
@@ -1882,8 +2128,15 @@ static int hiti_read_parse(void *vctx, const void **vjob, int data_fd, int copie
 		job->common.copies = job->hdr.copies;
 
 	/* Sanity check printer type vs job type */
-	switch(ctx->conn->type)
-	{
+	switch(ctx->conn->type)	{
+	// XXX add P11x
+	case P_HITI_461:
+		if (job->hdr.model != 461) {
+			ERROR("Unrecognized header!\n");
+			hiti_cleanup_job(job);
+			return CUPS_BACKEND_CANCEL;
+		}
+		break;
 	case P_HITI_51X:
 		if (job->hdr.model != 510) {
 			ERROR("Unrecognized header!\n");
@@ -1938,6 +2191,15 @@ static int hiti_read_parse(void *vctx, const void **vjob, int data_fd, int copie
 
 	/* Sanity check against paper */
 	switch (ctx->paper.type) {
+	case PAPER_TYPE_X4INCH:
+		// XXX P461 is 1280
+		// XXX P11x is ???
+		if (job->hdr.cols != 1280) {
+			ERROR("Illegal job on 4x6-inch paper!\n");
+			hiti_cleanup_job(job);
+			return CUPS_BACKEND_CANCEL;
+		}
+		break;
 	case PAPER_TYPE_5INCH:
 		if (job->hdr.cols != 1548) {
 			ERROR("Illegal job on 5-inch paper!\n");
@@ -2005,7 +2267,7 @@ static int hiti_read_parse(void *vctx, const void **vjob, int data_fd, int copie
 		}
 		break;
 	default:
-		ERROR("Unknown ribbon type!\n");
+		ERROR("Unknown ribbon type (%d)!\n", ctx->ribbon.type);
 		hiti_cleanup_job(job);
 		return CUPS_BACKEND_CANCEL;
 	}
@@ -2168,10 +2430,19 @@ static int hiti_main_loop(void *vctx, const void *vjob, int wait_for_return)
 	sf.cols_offset = calc_offset(ctx->calibration.horiz, 6, 11, 4);
 	sf.colorSeq = 0x87 + (job->hdr.overcoat ? 0xc0 : 0);
 	sf.copies = job->common.copies;
-	sf.printMode = 0x08 + (job->hdr.quality ? 0x02 : 0);
-	ret = hiti_docmd(ctx, CMD_EFD_SF, (uint8_t*) &sf, sizeof(sf), &resplen);
+	sf.printMode = (ctx->conn->type == P_HITI_461)
+		? 0 : 0x08 + (job->hdr.quality ? 0x02 : 0);
+	memset(sf.zero, 0, sizeof(sf.zero));
+	ret = hiti_docmd(ctx, CMD_EFD_SF, (uint8_t*) &sf,
+			 ctx->conn->type == P_HITI_461 ? sizeof(sf) : sizeof(sf)-4 ,
+			 &resplen);
 	if (ret)
 		return CUPS_BACKEND_FAILED;
+
+	// XXX on P461:
+	// request warning
+	// QJC
+	// then SF again
 
 	// XXX msg 8011 sent here on P52x (and maybe others?)
 
@@ -2187,6 +2458,14 @@ static int hiti_main_loop(void *vctx, const void *vjob, int wait_for_return)
 
 	INFO("Printer returned Job ID %04x\n", be16_to_cpu(jobid.jobid));
 
+	if (ctx->conn->type != P_HITI_525 && ctx->conn->type != P_HITI_461) {
+		uint8_t chs[2] = { 0, 1 }; /* Fixed..? */
+		resplen = 0;
+		ret = hiti_docmd(ctx, CMD_EFD_CHS, chs, sizeof(chs), &resplen);
+		if (ret)
+			return CUPS_BACKEND_FAILED;
+	}
+
 	if (ctx->conn->type == P_HITI_51X) {
 		ret = hiti_send_heat_data(ctx, job->hdr.quality, job->hdr.overcoat);
 		if (ret)
@@ -2198,21 +2477,43 @@ static int hiti_main_loop(void *vctx, const void *vjob, int wait_for_return)
 		if (ret)
 			return CUPS_BACKEND_FAILED;
 #endif
-	} else if (ctx->conn->type != P_HITI_525) {
-		uint8_t chs[2] = { 0, 1 }; /* Fixed..? */
-		resplen = 0;
-		ret = hiti_docmd(ctx, CMD_EFD_CHS, chs, sizeof(chs), &resplen);
-		if (ret)
-			return CUPS_BACKEND_FAILED;
-	}
-
-	if (ctx->conn->type != P_HITI_51X) {
+	} else {
 		const char *fname = hiti_get_heat_file(ctx, job->hdr.quality);
 		if (fname) {
-			ret = hiti_read_heattable_v2(ctx, fname);
-			if (ret)
-				return CUPS_BACKEND_FAILED;
-			// XXX send CMD_ESD_SHTPC (Heating Parameters & Tone Curve, ~7KB payload) instead?
+			if (ctx->conn->type == P_HITI_461) {
+				char full[256];
+				snprintf(full, sizeof(full), "%s/%s", corrtable_path, fname);
+
+				if (ctx->heattable_buf) {
+					free(ctx->heattable_buf);
+					ctx->heattable_buf = NULL;
+				}
+				ctx->heattable_buf = malloc(HEATTABLE_V2_MAX_SIZE);
+				if (!ctx->heattable_buf) {
+					ERROR("Memory allocation failed!\n");
+					return CUPS_BACKEND_FAILED;
+				}
+
+				int len = 0;
+				ret = dyesub_read_file(full, ctx->heattable_buf, HEATTABLE_V2_MAX_SIZE, &len);
+				if (ret)
+					return ret;
+
+				if (len != HEATTABLE_S_SIZE) {
+					ERROR("Unexpected heattable size (%d vs %d)\n", len, HEATTABLE_S_SIZE);
+					return CUPS_BACKEND_FAILED;
+				}
+
+				/* Send ESC_SHPTC with entire file contents */
+				ret =  hiti_shptc(ctx, ctx->heattable_buf, len);
+				if (ret)
+					return CUPS_BACKEND_FAILED;
+			} else {
+				ret = hiti_read_heattable_v2(ctx, fname);
+				if (ret)
+					return CUPS_BACKEND_FAILED;
+				// XXX send CMD_ESD_SHPTC (Heating Parameters & Tone Curve, ~7KB payload) instead?
+			}
 		}
 	}
 
@@ -2396,7 +2697,7 @@ static void hiti_cmdline(void)
 static int hiti_query_version(struct hiti_ctx *ctx)
 {
 	int ret;
-	uint16_t len = 93;  /* P525 has 93 byte payload, others are 79? */
+	uint16_t len = 256;  /* P525 has 93 byte payload, P461 has 97, others are 79? */
 	uint8_t buf[256];
 
 	ret = hiti_docmd_resp(ctx, CMD_RDC_RS, NULL, 0, buf, &len);
@@ -2536,9 +2837,15 @@ static int hiti_query_calibration(struct hiti_ctx *ctx)
 static int hiti_query_led_calibration(struct hiti_ctx *ctx)
 {
 	int ret;
-	uint16_t len = sizeof(ctx->led_calibration);
+	uint16_t len;
 
-	ret = hiti_docmd_resp(ctx, CMD_ERDC_RLC, NULL, 0, (uint8_t*)&ctx->led_calibration, &len);
+	if (ctx->conn->type == P_HITI_461) {
+		len = sizeof(ctx->led_calibration) - 4;
+		ret = hiti_docmd_resp(ctx, CMD_ERDC_RLC, NULL, 0, (uint8_t*)(&ctx->led_calibration)+4, &len);
+	} else {
+		len = sizeof(ctx->led_calibration);
+		ret = hiti_docmd_resp(ctx, CMD_ERDC_RLC, NULL, 0, (uint8_t*)&ctx->led_calibration, &len);
+	}
 	if (ret)
 		return ret;
 
@@ -2728,7 +3035,12 @@ static int hiti_query_markers(void *vctx, struct marker **markers, int *count)
 	if (ret)
 		return ret;
 
-	ctx->marker.levelnow = ctx->media_remain;
+	if (ctx->conn->type == P_HITI_461) {
+		ctx->marker.levelnow = CUPS_MARKER_UNKNOWN_OK;
+		// XXX alter this, check for errors and return 0 instead.
+	} else {
+		ctx->marker.levelnow = ctx->media_remain;
+	}
 
 	return CUPS_BACKEND_OK;
 }
@@ -2850,7 +3162,7 @@ static const char *hiti_prefixes[] = {
 
 const struct dyesub_backend hiti_backend = {
 	.name = "HiTi Photo Printers",
-	.version = "0.50",
+	.version = "0.53",
 	.uri_prefixes = hiti_prefixes,
 	.cmdline_usage = hiti_cmdline,
 	.cmdline_arg = hiti_cmdline_arg,
@@ -2876,6 +3188,7 @@ const struct dyesub_backend hiti_backend = {
 		{ 0x0d16, 0x0111, P_HITI_51X, NULL, "hiti-p510si"},
 		{ 0x0d16, 0x0112, P_HITI_51X, NULL, "hiti-p518s"},
 		{ 0x0d16, 0x0502, P_HITI_520, NULL, "hiti-p520l"},
+		{ 0x0d16, 0x0509, P_HITI_461, NULL, "hiti-p461"},
 		{ 0x0d16, 0x050e, P_HITI_525, NULL, "hiti-p525l"},
 		{ 0x0d16, 0x000f, P_HITI_530, NULL, "hiti-p530d"},
 		{ 0x0d16, 0x0009, P_HITI_720, NULL, "hiti-p720l"},
@@ -2915,12 +3228,15 @@ const struct dyesub_backend hiti_backend = {
       * Rework to take advantage of auto-vectorization?
       * Pre-compute then cache entire map on disk?
       * Use external "Cube LUT" implementation?
-   - Commands 8008, 8011, EST_SEHT, ESD_SHTPC, RDC_ROC, PCC_STP, CMD_EDM_*
-   - Test with P525, P720, P750
-   - Further investigation into P110 series
+   - Commands 8008, 8011, EST_SEHT, ESD_SHPTC, PCC_STP, CMD_EDM_*
+   - Test with P720, P750
    - Start research into P530D, X610
+   - Start research into M610, P910L  (Do they have HiTi firmware?)
    - Incorporate changes for CS-series card printers
    - More "Matrix table" decoding work
+   - Start working on "sheet type" models
+     - P110S
+     - P461 Prinhome
    - Pull in updated heat tables & LUTs from windows drivers
    - Figure out what to send from v2 heattables
 
@@ -2985,5 +3301,13 @@ const struct dyesub_backend hiti_backend = {
 
    Question:  how do we know which embedded table to use?
    ** embedded tables only seem present for CARD models.
+
+   Sheet Type
+
+    * "P4x6" 1280*1818 on P461/P310W/P320W, 1248*1836 on P110S
+    *  Matte/Glossy
+    *  Quality 0/1
+    *  Consumables 0/1
+    *  SF is different.  RVC does't work, need to infer code from where?
 
 */
