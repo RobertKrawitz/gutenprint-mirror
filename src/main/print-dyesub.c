@@ -231,6 +231,7 @@ typedef struct
 {
   int use_lut;
   int quality;
+  int mediaver;
 } hiti_privdata_t;
 
 typedef struct
@@ -9180,6 +9181,10 @@ static void hiti_printer_start(stp_vars_t *v, int model)
 
   if (!pd->privdata.hiti.use_lut)
 	  flags |= 0x02;
+  if (pd->privdata.hiti.mediaver) {
+          flags |= 0x04;
+          flags |= (pd->privdata.hiti.mediaver << 24);
+  }
 
   if (!strcmp(pd->pagesize, "B7"))
 	  pgcode = 8;
@@ -9212,7 +9217,8 @@ static void hiti_printer_start(stp_vars_t *v, int model)
   stp_put32_le(pgcode, v);
   stp_zfwrite((pd->overcoat->seq).data, 1,
 	      (pd->overcoat->seq).bytes, v);
-  stp_put32_le(0, v); /* ie BGR packed */
+
+  stp_put32_le(flags, v); /* ie BGR packed */
   stp_put32_le(pd->w_size * pd->h_size * 3, v);
 }
 

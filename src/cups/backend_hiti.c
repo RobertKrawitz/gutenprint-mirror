@@ -349,6 +349,7 @@ struct hiti_gpjobhdr {
 
 #define PAYLOAD_FLAG_YMCPLANAR 0x01
 #define PAYLOAD_FLAG_NOCORRECT 0x02
+#define PAYLOAD_FLAG_MEDIAVER  0x03
 
 #define HDR_COOKIE 0x54485047
 
@@ -2482,6 +2483,12 @@ static int hiti_main_loop(void *vctx, const void *vjob, int wait_for_return)
 		ret = hiti_docmd(ctx, CMD_EFD_CHS, chs, sizeof(chs), &resplen);
 		if (ret)
 			return CUPS_BACKEND_FAILED;
+	}
+
+	/* Media version override */
+	if (job->hdr.payload_flag & PAYLOAD_FLAG_MEDIAVER) {
+		ctx->ribbonvendor &= ~0x3f;
+		ctx->ribbonvendor |= ((job->hdr.payload_flag >> 24) & 0x3f);
 	}
 
 	if (ctx->conn->type == P_HITI_51X) {
