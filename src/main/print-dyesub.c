@@ -9409,7 +9409,7 @@ static void hiti_p510l_printer_start(stp_vars_t *v)
 /* HiTi P461 series */
 static const dyesub_pagesize_t hiti_p461_page[] =
 {
-  DEFINE_PAPER_SIMPLE( "w288h432", "4x6", PT1(1280,300), PT1(1818,300), DYESUB_PORTRAIT),
+  DEFINE_PAPER( "w288h432", "4x6", PT1(1280,300), PT1(1818,300), PT1(16,300), PT1(16,300), 0, 0, DYESUB_PORTRAIT),
 };
 
 LIST(dyesub_pagesize_list_t, hiti_p461_page_list, dyesub_pagesize_t, hiti_p461_page);

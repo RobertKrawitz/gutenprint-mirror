@@ -66,6 +66,7 @@ struct hiti_cmd {
 
 /* Printer Configuratio Control */
 #define CMD_PCC_RP     0x0301 /* Reset Printer (1 arg) */
+#define CMD_RCC_UNK    0x0310 /* XX Unknown */
 #define CMD_PCC_STP    0x030F /* Set Target Printer (1 arg) XXX -- 00 == master or 01 == slave ? Or maybe it's a bank select for CMD_EFM_RNV? */
 
 /* Request Device Status */
@@ -96,10 +97,16 @@ struct hiti_cmd {
 #define CMD_ERDC_C_RPCS 0x8008 /* CS Request Printer Correction Status */
 #define CMD_ERDC_CTV   0x8008 /* Color Table Version XXX p51x, string (14 byte reply?), error on p461 */
 #define CMD_ERDC_RPIDM 0x8009 /* Request PID and Model Code */
+#define CMD_ERDC_UNKA  0x800A /* XX Unknown */
+#define CMD_ERDC_UNKF  0x800D /* XX Unknown (1 arg) */
 #define CMD_ERDC_RTLV  0x800E /* Request T/L Voltage */
 #define CMD_ERDC_RRVC  0x800F /* Read Ribbon Vendor Code */
-#define CMD_ERDC_UNK1  0x8010 /* Unknown Query RE */
-#define CMD_ERDC_UNK2  0x8011 /* Unknown Query RE */
+#define CMD_ERDC_UNK0  0x8010 /* XX Unknown Query RE */
+#define CMD_ERDC_UNK1  0x8011 /* Unknown Query RE, 1 arg? */
+#define CMD_ERDC_UNK2  0x8012 /* Unknown Query RE */
+#define CMD_ERDC_UNK3  0x8013 /* Unknown Query RE */
+#define CMD_ERDC_UNK4  0x8014 /* Unknown Query RE */
+#define CMD_ERDC_UNK5  0x8015 /* Unknown Query RE */
 #define CMD_ERDC_RHA   0x801C /* Read Highlight Adjustment (6 resp) RE */
 
 // 8008 seen in Windows Comm @ 3211  (0 len response)
@@ -137,15 +144,23 @@ struct hiti_cmd {
 /* Extended Send Data */
 #define CMD_ESD_SEHT2  0x8303 /* Send Ext Heating Table (2 arg) */
 #define CMD_ESD_SEHT   0x8304 /* Send Ext Heating Table XX */
+#define CMD_ESD_UNK6   0x8306 /* Unknown, seen in FW update (1 byte payload) */
+#define CMD_ESD_UNK7   0x8307 /* Unknown, seen in FW update (no payload) */
+#define CMD_ESD_UNK8   0x8308 /* FW update payload (256 or 0xfc00 byte payload) */
 #define CMD_ESD_SEPD   0x8309 /* Send Ext Print Data (2 arg) + struct */
-#define CMD_ESD_UNK    0x830A /* Unknown, seen on P51x (4 byte payload) */
+#define CMD_ESD_SHCI   0x830A /* Unknown, seen on P51x (4 byte payload) */
 #define CMD_ESD_SHPTC  0x830B /* Send Heating Parameters & Tone Curve XX (4167 byte payload on p461) */
 #define CMD_ESD_C_SHPTC  0x830C /* CS Send Heating Parameters & Tone Curve XX (n arg) */
 
 /* Extended Flash/NVram */
+#define CMD_EFM_UNK3   0x8403 /* Write NVRAM, maybe? */
 #define CMD_EFM_RNV    0x8405 /* Read NVRam (1 arg) -- arg is offset, 1 byte resp of data @ that offset. -- P51x */
+#define CMD_EFM_UNK6   0x8406 /* Write NVRAM, maybe? */
 #define CMD_EFM_RD     0x8408 /* Read single location (2 byte offset arg, 1 byte of data @ that offset -- not P51x */
+#define CMD_EFM_UNKC   0x840C /* Write NVRAM, maybe? */
 #define CMD_EFM_SHA    0x840E /* Set Highlight Adjustment (5 arg) -- XXX RE */
+
+#define CMD_ERD_RTCV   0x8702 /* XX No idea what this does */
 
 /* Extended Security Control */
 #define CMD_ESC_SP     0x8900 /* Set Password */
@@ -154,11 +169,14 @@ struct hiti_cmd {
 /* Extended Debug Mode */
 #define CMD_EDM_CVD    0xE002 /* Common Voltage Drop Values (n arg) */
 #define CMD_EDM_CPP    0xE023 /* Clean Paper Path (1 arg) XX */
+#define CMD_EDM_UNK    0xE028 /* XX No idea */
 #define CMD_EDM_C_MC2CES 0xE02E /* CS Move card to Contact Encoder Station */
 #define CMD_EDM_C_MC2MES 0xE02F /* CS Move card to Mag Encoder Station */
 #define CMD_EDM_C_MC2CLES 0xE030 /* CS Move card to ContactLess Encoder Station */
 #define CMD_EDM_C_MC2EB 0xE031 /* CS Move card to Eject Box */
 #define CMD_EDM_C_MC2H 0xE037 /* CS Move card to Hopper */
+
+#define CMD_UNK_UNK   0xE200
 
 /* CMD_PCC_RP */
 #define RESET_PRINTER 0x01
@@ -1149,8 +1167,8 @@ static int hiti_attach(void *vctx, struct dyesub_connection *conn, uint8_t jobid
 		if (ret)
 			return ret;
 		if (ctx->conn->type == P_HITI_461) {
-			// XXX do something here for ribbonvendor
 			ctx->paper.type = PAPER_TYPE_X4INCH;
+			ctx->ribbonvendor = 0x1000; /* Hardcoded */
 		} else {
 			ret = hiti_query_ribbonvendor(ctx);
 			if (ret)
@@ -3162,7 +3180,7 @@ static const char *hiti_prefixes[] = {
 
 const struct dyesub_backend hiti_backend = {
 	.name = "HiTi Photo Printers",
-	.version = "0.53",
+	.version = "0.54",
 	.uri_prefixes = hiti_prefixes,
 	.cmdline_usage = hiti_cmdline,
 	.cmdline_arg = hiti_cmdline_arg,
@@ -3236,7 +3254,11 @@ const struct dyesub_backend hiti_backend = {
    - More "Matrix table" decoding work
    - Start working on "sheet type" models
      - P110S
-     - P461 Prinhome
+     - Others
+   - More work on P461 Prinhome
+     - Matte support
+     - Media version/type
+     - Anything else?
    - Pull in updated heat tables & LUTs from windows drivers
    - Figure out what to send from v2 heattables
 
