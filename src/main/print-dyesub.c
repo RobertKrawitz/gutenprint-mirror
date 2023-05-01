@@ -9432,6 +9432,113 @@ static void hiti_p461_printer_start(stp_vars_t *v)
   hiti_printer_start(v, 461);
 }
 
+static const stp_parameter_t hiti_p461_parameters[] =
+{
+  {
+    "UseLUT", N_("Internal Color Correction"), "Color=Yes,Category=Advanced Printer Setup",
+    N_("Use Internal Color Correction"),
+    STP_PARAMETER_TYPE_BOOLEAN, STP_PARAMETER_CLASS_FEATURE,
+    STP_PARAMETER_LEVEL_BASIC, 1, 1, STP_CHANNEL_NONE, 1, 0
+  },
+  {
+    "PrintSpeed", N_("Print Speed"), "Color=No,Category=Advanced Printer Setup",
+    N_("Print Speed"),
+    STP_PARAMETER_TYPE_STRING_LIST, STP_PARAMETER_CLASS_FEATURE,
+    STP_PARAMETER_LEVEL_BASIC, 1, 1, STP_CHANNEL_NONE, 1, 0
+  },
+  {
+    "MediaVer", N_("Media Version"), "Color=No,Category=Advanced Printer Setup",
+    N_("Printer media version"),
+    STP_PARAMETER_TYPE_INT, STP_PARAMETER_CLASS_FEATURE,
+    STP_PARAMETER_LEVEL_BASIC, 1, 1, STP_CHANNEL_NONE, 1, 0
+  },
+
+};
+#define hiti_p461_parameter_count (sizeof(hiti_p461_parameters) / sizeof(const stp_parameter_t))
+
+static const dyesub_stringitem_t hiti_p461_qualities[] =
+{
+  { "Standard", N_ ("Standard") },
+  { "Fine", N_ ("Fine") },
+};
+
+LIST(dyesub_stringlist_t, hiti_p461_quality_list, dyesub_stringitem_t, hiti_p461_qualities);
+
+
+static int
+hiti_p461_load_parameters(const stp_vars_t *v, const char *name,
+			 stp_parameter_t *description)
+{
+  int	i;
+  const dyesub_cap_t *caps = dyesub_get_model_capabilities(v,
+		  				stp_get_model_id(v));
+
+  if (caps->parameter_count && caps->parameters)
+    {
+      for (i = 0; i < caps->parameter_count; i++)
+        if (strcmp(name, caps->parameters[i].name) == 0)
+          {
+	    stp_fill_parameter_settings(description, &(caps->parameters[i]));
+	    break;
+          }
+    }
+
+  if (strcmp(name, "UseLUT") == 0)
+    {
+      description->deflt.boolean = 1;
+      description->is_active = 1;
+    }
+  else if (strcmp(name, "PrintSpeed") == 0)
+    {
+      description->bounds.str = stp_string_list_create();
+
+      const dyesub_stringlist_t *mlist = &hiti_p461_quality_list;
+      for (i = 0; i < mlist->n_items; i++)
+        {
+	  const dyesub_stringitem_t *m = &(mlist->item[i]);
+	  stp_string_list_add_string(description->bounds.str,
+				       m->name, m->text); /* Do *not* want this translated, otherwise use gettext(m->text) */
+	}
+      description->deflt.str = stp_string_list_param(description->bounds.str, 0)->name;
+      description->is_active = 1;
+    }
+  else if (strcmp(name, "MediaVer") == 0)
+    {
+      description->deflt.integer = 0;
+      description->bounds.integer.lower = 0;
+      description->bounds.integer.upper = 1;
+      description->is_active = 1;
+    }
+  else
+  {
+     return 0;
+  }
+  return 1;
+}
+
+static int hiti_p461_parse_parameters(stp_vars_t *v)
+{
+  dyesub_privdata_t *pd = get_privdata(v);
+  const char *quality = stp_get_string_parameter(v, "PrintSpeed");
+
+  /* No need to set global params if there's no privdata yet */
+  if (!pd)
+    return 1;
+
+  /* Parse options */
+  if (strcmp(quality, "Fine") == 0) {
+     pd->privdata.hiti.quality = 1;
+  } else {
+     pd->privdata.hiti.quality = 0;
+  }
+
+  pd->privdata.hiti.use_lut = stp_get_boolean_parameter(v, "UseLUT");
+  pd->privdata.hiti.mediaver = stp_get_int_parameter(v, "MediaVer");
+
+  return 1;
+}
+
+
 /* Magicard Series */
 static const dyesub_pagesize_t magicard_page[] =
 {
@@ -11589,10 +11696,10 @@ static const dyesub_cap_t dyesub_model_capabilities[] =
     NULL, NULL,
     &hiti_p520l_overcoat_list, NULL,
     NULL, NULL,
-    hiti_p720l_parameters,
-    hiti_p720l_parameter_count,
-    hiti_p720l_load_parameters,
-    hiti_p720l_parse_parameters,
+    hiti_p461_parameters,
+    hiti_p461_parameter_count,
+    hiti_p461_load_parameters,
+    hiti_p461_parse_parameters,
   },
   { /* Magicard Series w/ Duplex */
     7000,
