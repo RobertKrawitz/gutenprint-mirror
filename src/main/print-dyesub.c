@@ -11690,6 +11690,7 @@ static const dyesub_cap_t dyesub_model_capabilities[] =
     &hiti_p461_printsize_list,
     SHRT_MAX,
     DYESUB_FEATURE_FULL_WIDTH | DYESUB_FEATURE_FULL_HEIGHT
+      | DYESUB_FEATURE_WHITE_BORDER
       | DYESUB_FEATURE_NATIVECOPIES | DYESUB_FEATURE_HASBACKEND,
     &hiti_p461_printer_start, NULL,
     NULL, NULL,
