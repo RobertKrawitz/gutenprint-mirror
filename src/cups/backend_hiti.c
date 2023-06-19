@@ -2840,7 +2840,7 @@ static int hiti_query_unk8010(struct hiti_ctx *ctx)
 	int ret;
 	uint16_t len = sizeof(ctx->unk_8010);
 
-	ret = hiti_docmd_resp(ctx, CMD_ERDC_UNK1, NULL, 0, ctx->unk_8010, &len);
+	ret = hiti_docmd_resp(ctx, CMD_ERDC_UNK0, NULL, 0, ctx->unk_8010, &len);
 	if (ret)
 		return ret;
 
@@ -3187,7 +3187,7 @@ static const char *hiti_prefixes[] = {
 
 const struct dyesub_backend hiti_backend = {
 	.name = "HiTi Photo Printers",
-	.version = "0.54",
+	.version = "0.54.1",
 	.uri_prefixes = hiti_prefixes,
 	.cmdline_usage = hiti_cmdline,
 	.cmdline_arg = hiti_cmdline_arg,
