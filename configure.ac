@@ -1206,7 +1206,7 @@ echo "  Generated at `date` by $LOGNAME" |tee -a config.summary
 echo |tee -a config.summary
 echo "  Features:" |tee -a config.summary
 if test "$BUILD_CUPS" != "no" ; then
-    echo "    Build CUPS:                                 $BUILD_CUPS, installing in $cups_prefix" |tee -a config.summary
+    echo "    Build CUPS driver:                          $BUILD_CUPS, installing in $cups_prefix" |tee -a config.summary
     echo "        Build CUPS 1.2 enhancements:            $BUILD_CUPS_1_2" |tee -a config.summary
     echo "        Build CUPS PPD files:                   $BUILD_CUPS_PPDS" |tee -a config.summary
     if test "$BUILD_CUPS_PPDS" != "no" ; then
