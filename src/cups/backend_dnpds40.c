@@ -347,7 +347,7 @@ static void *dnp_combine_jobs(const void *vjob1,
 
 	/* Copy data blocks from job1 */
 	uint8_t *ptr, *ptr2;
-	char buf[9];
+	char buf[10];
 	ptr = job1->databuf;
 	while(ptr && ptr < (job1->databuf + job1->datalen)) {
 		int i;
@@ -362,7 +362,7 @@ static void *dnp_combine_jobs(const void *vjob1,
 			uint32_t newlen;
 
 			/* Fix up length in command */
-			snprintf(buf, sizeof(buf), "%08ld", planelen);
+			snprintf(buf, sizeof(buf), "%08lu", planelen);
 			memcpy(newjob->databuf + newjob->datalen + 24, buf, 8);
 
 			/* Alter BMP header */
@@ -3483,7 +3483,7 @@ static const char *dnpds40_prefixes[] = {
 
 const struct dyesub_backend dnpds40_backend = {
 	.name = "DNP DS-series / Citizen C-series",
-	.version = "0.145",
+	.version = "0.145.1",
 	.uri_prefixes = dnpds40_prefixes,
 	.cmdline_usage = dnpds40_cmdline,
 	.cmdline_arg = dnpds40_cmdline_arg,
