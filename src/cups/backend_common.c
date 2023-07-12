@@ -1,7 +1,7 @@
 /*
  *   CUPS Backend common code
  *
- *   Copyright (c) 2007-2021 Solomon Peachy <pizza@shaftnet.org>
+ *   Copyright (c) 2007-2023 Solomon Peachy <pizza@shaftnet.org>
  *
  *   The latest version of this program can be found at:
  *
@@ -29,7 +29,7 @@
 #include <signal.h>
 #include <strings.h>  /* For strncasecmp */
 
-#define BACKEND_VERSION "0.123G"
+#define BACKEND_VERSION "0.125G"
 
 #ifndef CORRTABLE_PATH
 #ifdef PACKAGE_DATA_DIR
@@ -638,6 +638,8 @@ skip_manuf_model:
 		c2.altset = altset;
 		c2.endp_up = endp_up;
 		c2.endp_down = endp_down;
+		c2.type = lookup_printer_type(backend,
+						desc->idVendor, desc->idProduct);
 		backend->query_serno(&c2, buf, STR_LEN_MAX);
 		serial = url_encode(buf);
 	}
@@ -1011,7 +1013,7 @@ static void dump_stats(struct dyesub_backend *backend, struct printerstats *stat
 void print_license_blurb(void)
 {
 	const char *license = "\n\
-Copyright 2007-2021 Solomon Peachy <pizza AT shaftnet DOT org>\n\
+Copyright 2007-2023 Solomon Peachy <pizza AT shaftnet DOT org>\n\
 \n\
 This program is free software; you can redistribute it and/or modify it\n\
 under the terms of the GNU General Public License as published by the Free\n\
@@ -1342,7 +1344,7 @@ int main (int argc, char **argv)
 
 	DEBUG("Multi-Call Dye-sublimation CUPS Backend version %s\n",
 	      BACKEND_VERSION);
-	DEBUG("Copyright 2007-2021 Solomon Peachy\n");
+	DEBUG("Copyright 2007-2023 Solomon Peachy\n");
 	DEBUG("This free software comes with ABSOLUTELY NO WARRANTY! \n");
 	DEBUG("Licensed under the GNU GPL.  Run with '-G' for more details.\n");
 	DEBUG("\n");
@@ -1579,8 +1581,10 @@ bypass:
 	PPD("StpUsbBackend=\"%s\"\n", backend_str ? backend_str : backend->name);
 	PPD("StpUsbVid=%04x\n", conn.usb_vid);
 	PPD("StpUsbPid=%04x\n", conn.usb_pid);
-	PPD("StpUsbBus=%03d\n", conn.bus_num);
-	PPD("StpUsbPort=%03d\n", conn.port_num);
+	if (test_mode < TEST_MODE_NOATTACH) {
+		PPD("StpUsbBus=%03d\n", conn.bus_num);
+		PPD("StpUsbPort=%03d\n", conn.port_num);
+	}
 
 	if (!uri || !strlen(uri)) {
 		if (backend->cmdline_arg(backend_ctx, argc, argv))
