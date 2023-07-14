@@ -225,6 +225,7 @@ typedef struct
   int delay;
   int deck;
   int margincutoff;
+  int backfinish;
 } mitsu70x_privdata_t;
 
 typedef struct
@@ -6945,6 +6946,283 @@ static void mitsu_cpm1_printer_init(stp_vars_t *v)
   mitsu_cpdneo_printer_init(v, 1);
 }
 
+/* Mitsubish CP-W5000 family */
+static const dyesub_pagesize_t mitsu_cpw5k_page[] =
+{
+  DEFINE_PAPER_SIMPLE( "w432h288", "6x4", PT1(1224,300), PT1(1864,300), DYESUB_LANDSCAPE),
+  DEFINE_PAPER_SIMPLE( "w432h432", "6x6", PT1(1824,300), PT1(1864,300), DYESUB_LANDSCAPE),
+  DEFINE_PAPER_SIMPLE( "w432h576", "6x8", PT1(1824,300), PT1(2464,300), DYESUB_PORTRAIT),
+  DEFINE_PAPER_SIMPLE( "w432h576-div2", "6x4*2", PT1(1824,300), PT1(2524,300), DYESUB_PORTRAIT),
+  DEFINE_PAPER_SIMPLE( "w432h648", "6x9", PT1(1824,300), PT1(2764,300), DYESUB_PORTRAIT),
+  DEFINE_PAPER_SIMPLE( "w432h864", "6x12", PT1(1824,300), PT1(3624,300), DYESUB_PORTRAIT),
+  DEFINE_PAPER_SIMPLE( "w432h864-div2", "6x6*2", PT1(1824,300), PT1(3684,300), DYESUB_PORTRAIT),
+  DEFINE_PAPER_SIMPLE( "w432h864-div3", "6x4*3", PT1(1824,300), PT1(3744,300), DYESUB_PORTRAIT),
+
+  DEFINE_PAPER_SIMPLE( "w490h346", "6.8x4.8", PT1(1464,300), PT1(2104,300), DYESUB_LANDSCAPE),
+  DEFINE_PAPER_SIMPLE( "w490h691", "6.8x9.6", PT1(2104,300), PT1(2904,300), DYESUB_PORTRAIT),
+
+  DEFINE_PAPER_SIMPLE( "w504h360", "7x5", PT1(1524,300), PT1(2164,300), DYESUB_LANDSCAPE),
+  DEFINE_PAPER_SIMPLE( "w504h720", "7x10", PT1(2164,300), PT1(3024,300), DYESUB_PORTRAIT),
+  DEFINE_PAPER_SIMPLE( "w504h720-div2", "7x5*2", PT1(2164,300), PT1(3084,300), DYESUB_PORTRAIT),
+
+  DEFINE_PAPER_SIMPLE( "w576h288", "8x4", PT1(1224,300), PT1(2464,300), DYESUB_LANDSCAPE),
+  DEFINE_PAPER_SIMPLE( "w576h432", "8x6", PT1(1824,300), PT1(2464,300), DYESUB_LANDSCAPE),
+  DEFINE_PAPER_SIMPLE( "w576h576", "8x8", PT1(2424,300), PT1(2464,300), DYESUB_LANDSCAPE),
+  DEFINE_PAPER_SIMPLE( "w576h576-div2", "8x4*2", PT1(2464,300), PT1(2484,300), DYESUB_PORTRAIT),
+  DEFINE_PAPER_SIMPLE( "c8x10", "8x10", PT1(2464,300), PT1(3024,300), DYESUB_PORTRAIT),
+  DEFINE_PAPER_SIMPLE( "c8x10-div2", "8x5*2", PT1(2464,300), PT1(3084,300), DYESUB_PORTRAIT),
+  DEFINE_PAPER_SIMPLE( "w576h792", "8x11", PT1(2464,300), PT1(3324,300), DYESUB_PORTRAIT),
+  DEFINE_PAPER_SIMPLE( "w576h842", "8x11.7", PT1(2464,300), PT1(3534,300), DYESUB_PORTRAIT),
+  DEFINE_PAPER_SIMPLE( "w576h864", "8x12", PT1(2464,300), PT1(3624,300), DYESUB_PORTRAIT),
+  DEFINE_PAPER_SIMPLE( "w576h864-div2", "8x6*2", PT1(2464,300), PT1(3684,300), DYESUB_PORTRAIT),
+  DEFINE_PAPER_SIMPLE( "w576h864-div4", "8x4*3", PT1(2464,300), PT1(3744,300), DYESUB_PORTRAIT),
+
+  DEFINE_PAPER_SIMPLE( "Custom", "Custom", -1, -1, DYESUB_PORTRAIT),
+};
+LIST(dyesub_pagesize_list_t, mitsu_cpw5k_page_list, dyesub_pagesize_t, mitsu_cpw5k_page);
+
+static const dyesub_printsize_t mitsu_cpw5k_printsize[] =
+{
+  /* Each cut adds 60 pixels */
+  { "300x300", "w432h288", 1224, 1864},
+  { "300x300", "w432h432", 1824, 1864},
+  { "300x300", "w432h576", 1824, 2464},
+  { "300x300", "w432h576-div2", 1824, 2524},
+  { "300x300", "w432h648", 1824, 2764},
+  { "300x300", "w432h864", 1824, 3624},
+  { "300x300", "w432h864-div2", 1824, 3684},
+  { "300x300", "w432h864-div3", 1824, 3744},
+
+  { "300x300", "w490h346", 1464, 2104},
+  { "300x300", "w490h691", 2104, 2904},
+
+  { "300x300", "w504h360", 1524, 2164},
+  { "300x300", "w504h720", 2164, 3024},
+  { "300x300", "w504h720-div2", 2164, 3084},
+
+  { "300x300", "w576h288", 1224, 2464},
+  { "300x300", "w576h432", 1824, 2464},
+  { "300x300", "w576h576", 2424, 2464},
+  { "300x300", "w576h576-div2", 2464, 2484},
+  { "300x300", "c8x10", 2464, 3024},
+  { "300x300", "c8x10-div2", 2464, 3884},
+  { "300x300", "w576h792", 2464, 3324},
+  { "300x300", "w576h842", 2464, 3534},
+  { "300x300", "w576h864", 2464, 3624},
+  { "300x300", "w576h864-div2", 2464, 3684},
+  { "300x300", "w576h864-div3", 2464, 3744},
+
+  { "300x300", "Custom", 2464, 3624}, /* Maximum */
+};
+LIST(dyesub_printsize_list_t, mitsu_cpw5k_printsize_list, dyesub_printsize_t, mitsu_cpw5k_printsize);
+
+static const overcoat_t mitsu_cpw5k_overcoat[] =
+{
+  {"Glossy",  N_("Glossy"),  {1, "\x00"}},
+  {"GlossySemi",  N_("Semi-Glossy"),  {1, "\x01"}},
+  {"Matte",  N_("Satin"),  {1, "\x02"}},
+};
+
+LIST(overcoat_list_t, mitsu_cpw5k_overcoat_list, overcoat_t, mitsu_cpw5k_overcoat);
+
+static const dyesub_stringitem_t mitsu_cpw5k_backfinishes[] =
+{
+  { "None",       N_ ("None") },
+  { "Glossy",     N_ ("Glossy") },
+  { "GlossySemi", N_ ("Semi-Glossy") },
+  { "Matte",      N_ ("Satin") }
+};
+LIST(dyesub_stringlist_t, mitsu_cpw5k_backfinish_list, dyesub_stringitem_t, mitsu_cpw5k_backfinishes);
+
+static const stp_parameter_t mitsu_cpw5k_parameters[] =
+{
+  {
+    "BackFinish", N_("Back Finish"), "Color=No,Category=Advanced Printer Setup",
+    N_("Back Finish"),
+    STP_PARAMETER_TYPE_STRING_LIST, STP_PARAMETER_CLASS_FEATURE,
+    STP_PARAMETER_LEVEL_BASIC, 1, 1, STP_CHANNEL_NONE, 1, 0
+  },
+  {
+    "UseLUT", N_("Internal Color Correction"), "Color=Yes,Category=Advanced Printer Setup",
+    N_("Use Internal Color Correction"),
+    STP_PARAMETER_TYPE_BOOLEAN, STP_PARAMETER_CLASS_FEATURE,
+    STP_PARAMETER_LEVEL_BASIC, 1, 1, STP_CHANNEL_NONE, 1, 0
+  },
+  {
+    "Sharpen", N_("Image Sharpening"), "Color=No,Category=Advanced Printer Setup",
+    N_("Sharpening to apply to image (0 is off, 1 is min, 9 is max"),
+    STP_PARAMETER_TYPE_INT, STP_PARAMETER_CLASS_FEATURE,
+    STP_PARAMETER_LEVEL_BASIC, 1, 1, STP_CHANNEL_NONE, 1, 0
+  },
+};
+#define mitsu_cpw5k_parameter_count (sizeof(mitsu_cpw5k_parameters) / sizeof(const stp_parameter_t))
+
+static int
+mitsu_cpw5k_load_parameters(const stp_vars_t *v, const char *name,
+			  stp_parameter_t *description)
+{
+  int	i;
+  const dyesub_cap_t *caps = dyesub_get_model_capabilities(v,
+		  				stp_get_model_id(v));
+
+  if (caps->parameter_count && caps->parameters)
+    {
+      for (i = 0; i < caps->parameter_count; i++)
+        if (strcmp(name, caps->parameters[i].name) == 0)
+          {
+	    stp_fill_parameter_settings(description, &(caps->parameters[i]));
+	    break;
+          }
+    }
+  if (strcmp(name, "BackFinish") == 0)
+    {
+      description->bounds.str = stp_string_list_create();
+
+      const dyesub_stringlist_t *mlist = &mitsu_cpw5k_backfinish_list;
+      for (i = 0; i < mlist->n_items; i++)
+        {
+	  const dyesub_stringitem_t *m = &(mlist->item[i]);
+	  stp_string_list_add_string(description->bounds.str,
+				       m->name, m->text); /* Do *not* want this translated, otherwise use gettext(m->text) */
+	}
+      description->deflt.str = stp_string_list_param(description->bounds.str, 0)->name;
+      description->is_active = 1;
+    }
+  else if (strcmp(name, "UseLUT") == 0)
+    {
+      description->deflt.boolean = 1;
+      description->is_active = 1;
+    }
+  else if (strcmp(name, "Sharpen") == 0)
+    {
+      description->deflt.integer = 4;
+      description->bounds.integer.lower = 0;
+      description->bounds.integer.upper = 8;
+      description->is_active = 1;
+    }
+  else
+  {
+     return 0;
+  }
+  return 1;
+}
+
+static int mitsu_cpw5k_parse_parameters(stp_vars_t *v)
+{
+  const char *backfinish = stp_get_string_parameter(v, "BackFinish");
+  dyesub_privdata_t *pd = get_privdata(v);
+
+  /* No need to set global params if there's no privdata yet */
+  if (!pd)
+    return 1;
+
+  /* Parse options */
+  if (strcmp(backfinish, "None") == 0) {
+     pd->privdata.m70x.backfinish = 0xff;
+  } else if (strcmp(backfinish, "Glossy") == 0) {
+     pd->privdata.m70x.backfinish = 0;
+  } else if (strcmp(backfinish, "GlossySemi") == 0) {
+     pd->privdata.m70x.backfinish = 1;
+  } else if (strcmp(backfinish, "Matte") == 0) {
+     pd->privdata.m70x.backfinish = 2;
+  } else {
+     pd->privdata.m70x.backfinish = 0;
+  }
+
+  pd->privdata.m70x.use_lut = !stp_get_boolean_parameter(v, "UseLUT");
+  pd->privdata.m70x.sharpen = stp_get_int_parameter(v, "Sharpen");
+
+  return 1;
+}
+
+static void mitsu_cpw5k_printer_init(stp_vars_t *v)
+{
+  dyesub_privdata_t *pd = get_privdata(v);
+
+  char cuts = 0;
+  short cut1 = 0, cut2 = 0;
+  char duplex = 0;
+
+  if (pd->duplex_mode) {
+    if (strcmp(pd->duplex_mode,"None"))
+      duplex = 1;
+    else
+      duplex = 0;
+  }
+
+  if (!strcmp(pd->pagesize,"w432h576-div2")) {
+    cuts = 1;
+    cut1 = 1212;
+  } else if (!strcmp(pd->pagesize,"w432h864-div2")) {
+    cuts = 1;
+    cut1 = 1812;
+  } else if (!strcmp(pd->pagesize,"w432h864-div3")) {
+    cuts = 2;
+    cut1 = 1212;
+    cut2 = 2472;
+  } else if (!strcmp(pd->pagesize,"w504h720-div2")) {
+    cuts = 1;
+    cut1 = 1512;
+  } else if (!strcmp(pd->pagesize,"w576h576-div2")) {
+    cuts = 1;
+    cut1 = 1212;
+  } else if (!strcmp(pd->pagesize,"c8x10-div2")) {
+    cuts = 1;
+    cut1 = 1512;
+  } else if (!strcmp(pd->pagesize,"w576h864-div2")) {
+    cuts = 1;
+    cut1 = 1812;
+  } else if (!strcmp(pd->pagesize,"w576h864-div3")) {
+    cuts = 2;
+    cut1 = 1212;
+    cut2 = 2472;
+  }
+
+  /* Page setup */
+  stp_putc(0x1b, v);
+  stp_putc(0x53, v);
+  stp_putc(0x50, v);
+  stp_putc(0x30, v);
+  stp_put16_be(pd->w_size, v);  /* Columns */
+  stp_put16_be(pd->h_size, v);  /* Rows */
+  stp_putc(cuts, v);
+  stp_put16_be(cut1, v);
+  stp_put16_be(cut2, v);
+  stp_putc(duplex, v);
+  stp_zfwrite((pd->overcoat->seq).data, 1,
+	      (pd->overcoat->seq).bytes, v);
+  stp_putc(pd->privdata.m70x.backfinish, v);
+  dyesub_nputc(v, 0x00, 2);
+  stp_putc(pd->privdata.m70x.use_lut, v);
+  stp_putc(pd->privdata.m70x.sharpen, v); /* Horizontal */
+  stp_putc(pd->privdata.m70x.sharpen, v); /* Vertical */
+  dyesub_nputc(v, 0x00, 512-21);
+
+  /* Plane header */
+  stp_putc(0x1b, v);
+  stp_putc(0x5a, v);
+  stp_putc(0x54, v);
+  stp_putc(0x01, v);
+  dyesub_nputc(v, 0x00, 4);
+  stp_put16_be(pd->w_size, v);  /* Columns */
+  stp_put16_be(pd->h_size, v);  /* Rows */
+  dyesub_nputc(v, 0x00, 512-12);
+}
+
+static void mitsu_cpw5k_job_end(stp_vars_t *v)
+{
+  stp_putc(0x1b, v);
+  stp_putc(0x5a, v);
+  stp_putc(0x54, v);
+  stp_putc(0x01, v);
+  dyesub_nputc(v, 0x00, 9);
+  stp_putc(0x01, v);
+  dyesub_nputc(v, 0x00, 512-14);
+}
+
+// mitsu_cpw5k_job_end
+//    print start header (512b)
+
 /* Fujifilm ASK-300 */
 static const dyesub_pagesize_t fuji_ask300_page[] =
 {
@@ -11313,6 +11591,24 @@ static const dyesub_cap_t dyesub_model_capabilities[] =
     mitsu_cp30_parameter_count,
     mitsu_cp30_load_parameters,
     mitsu_cp30_parse_parameters,
+  },
+  { /* Mitsubishi CP-W5000 family */
+    4120,
+    &rgb_ink_list,
+    &res_300dpi_list,
+    &mitsu_cpw5k_page_list,
+    &mitsu_cpw5k_printsize_list,
+    SHRT_MAX,
+    DYESUB_FEATURE_FULL_WIDTH | DYESUB_FEATURE_FULL_HEIGHT | DYESUB_FEATURE_NATIVECOPIES | DYESUB_FEATURE_DUPLEX | DYESUB_FEATURE_HASBACKEND,
+    mitsu_cpw5k_printer_init, NULL,
+    NULL, NULL,
+    NULL, NULL, /* No block funcs */
+    &mitsu_cpw5k_overcoat_list, NULL,
+    NULL, mitsu_cpw5k_job_end,
+    mitsu_cpw5k_parameters,
+    mitsu_cpw5k_parameter_count,
+    mitsu_cpw5k_load_parameters,
+    mitsu_cpw5k_parse_parameters,
   },
   { /* Fujifilm ASK-2000/2500 */
     4200,

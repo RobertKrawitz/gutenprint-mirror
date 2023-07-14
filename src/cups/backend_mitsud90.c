@@ -1,7 +1,7 @@
 /*
  *   Mitsubishi CP-D90DW Photo Printer CUPS backend
  *
- *   (c) 2019-2021 Solomon Peachy <pizza@shaftnet.org>
+ *   (c) 2019-2023 Solomon Peachy <pizza@shaftnet.org>
  *
  *   The latest version of this program can be found at:
  *
@@ -47,35 +47,107 @@
 
 /* Printer data structures */
 #define COM_STATUS_TYPE_MODEL   0x01 // 10, null-terminated ASCII. 'CPD90D'
+#define W5K_STATUS_TYPE_MODEL   0x01 // 5, ASCII, non-terminated: 'W5000'
 #define COM_STATUS_TYPE_x02     0x02 // 1, 0x5f ?
 #define CM1_STATUS_TYPE_ISERIAL 0x03 // 24, full iSerial string in UTF16(LE)
 #define CM1_STATUS_TYPE_SERIAL  0x04 // 6, serial number only (ascii)
+#define W5K_STATUS_TYPE_SERIAL  0x06 // 8, 36 30 31 34 30 35 43 20 (601405M )
+#define W5K_STATUS_TYPE_x07     0x07 // 6, 30 38 46 35 46 37       (08F5F7)
+#define W5K_STATUS_TYPE_x08     0x08 // 9, 00 00 00 00 00 00 00 00 00
+#define W5K_STATUS_TYPE_x09     0x09 // 9, 00 00 00 00 00 00 00 00 00
 #define CM1_STATUS_TYPE_FW_0a   0x0a // 8, 34 34 38 41 31 32 29 f4 (448A12)
-#define COM_STATUS_TYPE_FW_0b   0x0b // 8, 34 31 34 42 31 31 a7 de (414D11)
-#define COM_STATUS_TYPE_FW_MA   0x0c // 8, 34 31 35 41 38 31 86 bf (415A81)  // MAIN FW
+#define COM_STATUS_TYPE_FW_LOADER 0x0b // 8, 34 31 34 42 31 31 a7 de (414D11)
+#define COM_STATUS_TYPE_FW_MAIN  0x0c // 8, 34 31 35 41 38 31 86 bf (415A81)  // MAIN FW
 #define COM_STATUS_TYPE_FW_F    0x0d // 8, 34 31 36 41 35 31 dc 8a (416A51)  // FPGA FW
 #define COM_STATUS_TYPE_FW_T    0x0e // 8, 34 31 37 45 31 31 e7 e6 (417E11)  // TABLE FW
-#define COM_STATUS_TYPE_FW_0f   0x0f // 8, 34 31 38 41 31 32 6c 64 (418A12)
-#define COM_STATUS_TYPE_FW_11   0x11 // 8, 34 32 31 51 31 31 74 f2 (421Q11)
-#define COM_STATUS_TYPE_FW_ME   0x13 // 8, 34 31 39 45 31 31 15 bf (419E11)  // MECHA FW
+#define COM_STATUS_TYPE_FW_TAG  0x0f // 8, 34 31 38 41 31 32 6c 64 (418A12)
 
+#define W5K_STATUS_TYPE_FW_LUT  0x10 // 8, 33 37 30 41 32 34 91 22 (370A24)
+#define COM_STATUS_TYPE_FW_SATIN 0x11 // 8, 34 32 31 51 31 31 74 f2 (421Q11)
+#define W5K_STATUS_TYPE_FW_12   0x12 // 8, 30 30 30 30 30 30 30 30 (000000)
+#define COM_STATUS_TYPE_FW_ME   0x13 // 8, 34 31 39 45 31 31 15 bf (419E11)  // MECHA FW, NOT W5K
+#define W5K_STATUS_TYPE_x15     0x15 // 2, 00 00
 #define COM_STATUS_TYPE_ERROR   0x16 // 11 (see below)
 #define COM_STATUS_TYPE_MECHA   0x17 // 2  (see below)
+#define W5K_STAUTS_TYPE_x1a     0x1a // 1,  00  (error flag?  0x10 seems to be a
 #define COM_STATUS_TYPE_x1e     0x1e // 1, power state or time?  (x00)
 #define COM_STATUS_TYPE_TEMP    0x1f // 1  (see below)
-#define COM_STATUS_TYPE_x22     0x22 // 2,  all 0  (counter?)
+
+#define W5K_STATUS_TYPE_x20     0x20 // 1,  00
+#define COM_STATUS_TYPE_x22     0x22 // 2,  all 0  (counter?), NOT W5K.
+#define W5K_STATUS_TYPE_x23     0x23 // 16, all 0
+#define W5K_STATUS_TYPE_x24     0x24 // 26, all 0
+#define W5K_STATUS_TYPE_x25     0x25 // 16, all 0
 #define COM_STATUS_TYPE_x28     0x28 // 2, next jobid? (starts 00 01 at power cycle, increments by 1 for each print)
-#define COM_STATUS_TYPE_x29     0x29 // 8,  e0 07 00 00 21 e6 b3 22 or e0 07 80 96 3f 28 12 2d
+#define COM_STATUS_TYPE_INKID   0x29 // 8,  e0 07 00 00 21 e6 b3 22 or e0 07 80 96 3f 28 12 2d or e0 07 00 00 2b e8 db bd
 #define COM_STATUS_TYPE_MEDIA   0x2a // 10 (see below)
-#define COM_STATUS_TYPE_x2b     0x2b // 2,  all 0 (counter?)
-#define COM_STATUS_TYPE_x2c     0x2c // 2,  00 56 (counter?) or 00 28
-#define COM_STATUS_TYPE_x65     0x65 // 50, see below
+#define COM_STATUS_TYPE_x2b     0x2b // 2, all 0
+#define W5K_STATUS_TYPE_INKID2  0x2b // 8, 0c 57 dc 00 [a1 18] 00 00
+#define COM_STATUS_TYPE_x2c     0x2c // 2, 00 56 (counter?)
+#define W5K_STATUS_TYPE_x2c     0x2c // 12,06 00 00 00 00 00 00 00 40 54 33 01
+#define W5K_STATUS_TYPE_x2d     0x2d // 4, all 0
+
+#define W5K_STATUS_TYPE_x30     0x30 // 2, all 0
+#define W5K_STATUS_TYPE_x31     0x31 // 2, 00 44
+#define W5K_STATUS_TYPE_x33     0x33 // 12, all 0
+#define W5K_STATUS_TYPE_x34     0x34 // 2, 00 4f
+#define W5K_STATUS_TYPE_x35     0x35 // 2, 02
+#define W5K_STATUS_TYPE_x37     0x37 // 2, 02
+#define W5K_STATUS_CNT_HEAD     0x3d // 4
+#define W5K_STATUS_CNT_SERVICE  0x3e // 4
+#define W5K_STATUS_CNT_PRINTED  0x3f // 4
+
+#define W5K_STATUS_TYPE_x40     0x40 // 4, 00 00 3f b0 (seen it go up and down)
+#define W5K_STATUS_TYPE_x45     0x45 // 4, 00 00 00 84 (counter?) <-- incremetns one per print
+#define W5K_STATUS_TYPE_DENSITY 0x46 // 2
+#define W5K_STATUS_TYPE_TPHR    0x4b // 2 // Thermal Print Head Resistance
+#define W5K_STATUS_TYPE_TPHSN   0x4c // 8 // Thermal Print Head Serno (ASCII, non-terminated)
+
+#define W5K_STATUS_TYPE_x52     0x52 // 1, 42
+#define W5K_STATUS_CNT_CUTTER   0x5b
+
+#define W5K_STATUS_CNT_SLITTER  0x60
+#define COM_STATUS_TYPE_x65     0x65 // 50, see below (sensors?)
+#define W5K_STATUS_TYPE_x65     0x65 // 54, see below
+#define W5K_STATUS_TYPE_LENGTHS 0x6f // 16, BLANKLENA_s16, BLANKLENB_s16, 00 00, MARGINLEN s16, 00 00, CUTLEN_s16, 00 00 00 00
+
+#define W5K_STATUS_TYPE_x70     0x70 // 16, 0a 07 ff 0b 00 00 00 00 00 00 00 00 00 00 00 00
+#define W5K_STATUS_TYPE_MOTOR3  0x71 // 16, NN NN NN NN TT TT TT TT  00 00 00 00 00 00 00 00
+#define W5K_STATUS_TYPE_MOTOR5  0x72 // 16, NN NN NN NN TT TT TT TT  00 00 00 00 00 00 00 00
+#define W5K_STATUS_TYPE_MOTOR1  0x73 // 4, CC CC CC CC
+
 #define D90_STATUS_TYPE_ISEREN  0x82 // 1,  80 (iserial disabled)
 #define COM_STATUS_TYPE_x83     0x83 // 1,  00
+#define W5K_STATUS_TYPE_x83     0x83 // 2, 00 80
 #define D90_STATUS_TYPE_x84     0x84 // 1,  00
+#define W5K_STATUS_TYPE_x84     0x84 // 2, 00 0a
+#define D90_STATUS_TYPE_x85     0x85 // 2, 00 ?? BE, wait time? combined total of 5.
+#define W5K_STATUS_TYPE_x85     0x85 // 2, 00 04
+#define W5K_STATUS_TYPE_x86     0x86 // 2, 01 2c
+#define W5K_STATUS_TYPE_DMAXY   0x87 // 1
+#define W5K_STATUS_TYPE_DMINY   0x88 // 1
+#define W5K_STATUS_TYPE_DMAXM   0x89 // 1
+#define W5K_STATUS_TYPE_DMINM   0x8a // 1
+#define W5K_STATUS_TYPE_DMAXC   0x8b // 1
+#define W5K_STATUS_TYPE_DMINC   0x8c // 1
+#define W5K_STATUS_TYPE_LUT     0x8d // 120, 53 4c 54 41 58 32 37 30 -- "SLTAX270" for older media type (vs "SLTA7180" for new media type), followed by 14 more entries for B1-7/C1-7
+#define W5K_STATUS_TYPE_x8e     0x8e // 8, all ff
 
-//#define D90_STATUS_TYPE_x85    0x85 // 2, 00 ?? BE, wait time?
-                                    // combined total of 5.
+#define W5K_STATUS_TYPE_x97     0x97 // 2, 00 01
+
+#define W5K_STATUS_TYPE_xc0     0xc0 // 1, 00
+#define W5K_STATUS_TYPE_xc1     0xc1 // 1, 00
+#define W5K_STATUS_TYPE_xc2     0xc2 // 1, 00
+#define W5K_STATUS_TYPE_xc3     0xc3 // 1, 00
+#define W5K_STATUS_TYPE_xc4     0xc4 // 1, 00
+#define W5K_STATUS_TYPE_xc5     0xc5 // 1, 00
+#define W5K_STATUS_TYPE_xc6     0xc6 // 1, 00
+#define W5K_STATUS_TYPE_xc7     0xc7 // 1, 00
+#define W5K_STATUS_TYPE_xc8     0xc8 // 1, 00
+#define W5K_STATUS_TYPE_xc9     0xc9 // 1, 00
+#define W5K_STATUS_TYPE_xca     0xca // 1, 00
+#define W5K_STATUS_TYPE_xcb     0xcb // 1, 00
+#define W5K_STATUS_TYPE_xcf     0xcf // 1, 00
 
 struct mitsud90_fw_resp_single {
 	uint8_t  version[6];
@@ -113,7 +185,7 @@ struct mitsud90_info_resp {
 	uint8_t  x1e;
 	uint8_t  x22[2];
 	uint16_t x28;
-	uint8_t  x29[8];
+	uint8_t  inkid[8];
 	uint8_t  x2b[2];
 	uint8_t  x2c[2];
 	uint8_t  x65[50];
@@ -135,15 +207,39 @@ struct mitsum1_info_resp {
 	uint8_t  x1e;
 	uint8_t  x22[2];
 	uint16_t x28;
-	uint8_t  x29[8];
+	uint8_t  inkid[8];
 	uint8_t  x2b[2];
 	uint8_t  x2c[2];
 	uint8_t  x65[50];
 	uint8_t  x83;
 } __attribute__((packed));
 
+struct mitsuw5k_info_resp {
+	uint8_t  hdr[4];  /* e4 47 44 30 */
+	uint8_t  model[5];
+	uint8_t  x02;
+	struct mitsud90_fw_resp_single fw_vers[7];
+	uint8_t  x1a;
+	uint8_t  x1e;
+	uint8_t  inkid[8];
+	uint8_t  x2b[8];
+	uint8_t  x2c[12];
+	uint32_t cnt_head;
+	uint32_t cnt_service;
+	uint32_t cnt_printed;
+	uint32_t cnt_cutter;
+	uint32_t cnt_slitter;
+#if 0
+	uint32_t x40;
+	uint32_t x45;
+	uint8_t  x65[54];
+	uint8_t  x83[2];
+	uint8_t  x84[2];
+#endif
+} __attribute__((packed));
 
 #define D90_MECHA_STATUS_IDLE         0x00
+#define W5K_MECHA_STATUS_PRINTING     0x20
 #define D90_MECHA_STATUS_PRINTING     0x50
 #define D90_MECHA_STATUS_INIT         0x80
 #define D90_MECHA_STATUS_INIT_FEEDCUT 0x10
@@ -190,7 +286,7 @@ struct mitsud90_job_hdr {
 	uint8_t  numcuts; /* # of cuts (0-3) but 0-8 legal */
 /*@0x10*/
 	struct {
-		uint16_t position;  // @ center?
+		uint16_t position;  // BE, @ center
 		uint8_t  margincut; /* 0 for double cut, 1 for single */
 		uint8_t  zeropad;
 	} cutlist[8] __attribute__((packed));  /* 3 is current legal max */
@@ -238,11 +334,11 @@ struct mitsud90_job_footer {
 } __attribute__((packed));
 
 struct mitsud90_memcheck {
-	uint8_t  hdr[4]; /* 1b 47 44 33 */
-	uint8_t  unk[2]; /* 00 33 */
+	uint8_t  hdr[6]; /* 1b 47 44 33 00 33 */
 	uint16_t cols;   /* BE */
 	uint16_t rows;   /* BE */
-	uint8_t  unk_b[4]; /* 64 00 00 01  */
+	uint8_t  waittime; /* 0-100 */
+	uint8_t  unk[3]; /* 00 00 01  */
 	uint8_t  zero_fill[498];
 } __attribute__((packed));
 
@@ -252,11 +348,45 @@ struct mitsud90_memcheck_resp {
 	uint8_t  mem_bad;  /* 0x00 is ok */
 } __attribute__((packed));
 
+struct mitsuw5k_job_hdr {
+	uint8_t hdr[4]; // 1b 53 50 30
+	uint16_t cols;
+	uint16_t rows;
+	uint8_t  cuts;  // 0-2
+	uint16_t cut1;
+	uint16_t cut2;
+	uint8_t single;  // 1:single page, 0:duplex
+	uint8_t	finish;  // 0:gloss, 1:semi-gloss 2:matte
+	uint8_t	finishback; //	0:gloss, 1:semi-gloss, 2:matte,	ff:none
+	uint8_t	unk[2];  // XXX 01 00, 01 01, 01 02 seen on windows driver, latter two with duplex of some sort.  00 00 hardcoded with linux driver.
+	uint8_t	colorconv;  //	1: off,	0: internal
+	uint8_t  sharp_H;    // 0-8 or 0xff (ie printer)
+	uint8_t  sharp_V;    // 0-8 or 0xff (ie printer)
+/*@21*/	uint8_t  pad[512-21];
+} __attribute__((packed));
+
+struct mitsuw5k_plane_hdr {
+	int8_t  hdr[4]; // 1b 5a 54 01
+	uint8_t  zero[4];
+	uint16_t cols;
+	uint16_t rows;
+	uint8_t  zero2;
+	uint8_t  printout;  // 1 to start printing
+	uint8_t  zero3;
+/*@15*/	uint8_t  pad[512-15];
+} __attribute__((packed));
+
 static const char *mitsud90_mecha_statuses(const uint8_t *code)
 {
 	switch (code[0]) {
 	case D90_MECHA_STATUS_IDLE:
 		return "Idle";
+	case W5K_MECHA_STATUS_PRINTING:
+		// codes seen:
+		// 22  30 31 32 33 34 35 37 38  <-- Side A?
+		// 42  50 51 52 53    55 57 58  <-- Side B?
+		// 60  <-- feeding?
+		return "Printing (Unknown)";
 	case D90_MECHA_STATUS_PRINTING:
 		switch (code[1]) {
 		case D90_MECHA_STATUS_PRINT_FEEDING:
@@ -456,6 +586,7 @@ struct mitsud90_printjob {
 
 	int is_raw;
 	int is_pano;
+	int is_duplex;
 
 	int m1_colormode;
 
@@ -463,17 +594,20 @@ struct mitsud90_printjob {
 
 	int has_footer;
 	struct mitsud90_job_footer footer;
+
+	int has_start;
 };
 
 struct mitsud90_ctx {
 	struct dyesub_connection *conn;
 
-	char serno[7]; /* 6+null */
+	char serno[9]; /* 8+null */
 	char fwver[7]; /* 6+null */
 
 	/* Used in parsing.. */
 	struct mitsud90_job_footer holdover;
 	int holdover_on;
+	int duplex_on;
 
 	int pano_page;
 
@@ -486,19 +620,23 @@ struct mitsud90_ctx {
 static int mitsud90_query_media(struct mitsud90_ctx *ctx, struct mitsud90_media_resp *resp)
 {
 	uint8_t cmdbuf[8];
+	uint8_t cmdlen = 0;
+
 	int ret, num;
 
-	cmdbuf[0] = 0x1b;
-	cmdbuf[1] = 0x47;
-	cmdbuf[2] = 0x44;
-	cmdbuf[3] = 0x30;
-	cmdbuf[4] = 0;
-	cmdbuf[5] = 0;
-	cmdbuf[6] = 0x01;  /* Number of commands */
-	cmdbuf[7] = COM_STATUS_TYPE_MEDIA;
+	cmdbuf[cmdlen++] = 0x1b;
+	cmdbuf[cmdlen++] = 0x47;
+	cmdbuf[cmdlen++] = 0x44;
+	cmdbuf[cmdlen++] = 0x30;
+	if (ctx->conn->type != P_MITSU_W5000) {
+		cmdbuf[cmdlen++] = 0;
+		cmdbuf[cmdlen++] = 0;
+	}
+	cmdbuf[cmdlen++] = 0x01;  /* Number of commands */
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_MEDIA;
 
 	if ((ret = send_data(ctx->conn,
-			     cmdbuf, sizeof(cmdbuf))))
+			     cmdbuf, cmdlen)))
 		return ret;
 	memset(resp, 0, sizeof(*resp));
 
@@ -518,21 +656,24 @@ static int mitsud90_query_media(struct mitsud90_ctx *ctx, struct mitsud90_media_
 static int mitsud90_query_status(struct mitsud90_ctx *ctx, struct mitsud90_status_resp *resp)
 {
 	uint8_t cmdbuf[10];
+	uint8_t cmdlen = 0;
 	int ret, num;
 
-	cmdbuf[0] = 0x1b;
-	cmdbuf[1] = 0x47;
-	cmdbuf[2] = 0x44;
-	cmdbuf[3] = 0x30;
-	cmdbuf[4] = 0;
-	cmdbuf[5] = 0;
-	cmdbuf[6] = 0x03;  /* Number of commands */
-	cmdbuf[7] = COM_STATUS_TYPE_ERROR;
-	cmdbuf[8] = COM_STATUS_TYPE_MECHA;
-	cmdbuf[9] = COM_STATUS_TYPE_TEMP;
+	cmdbuf[cmdlen++] = 0x1b;
+	cmdbuf[cmdlen++] = 0x47;
+	cmdbuf[cmdlen++] = 0x44;
+	cmdbuf[cmdlen++] = 0x30;
+	if (ctx->conn->type != P_MITSU_W5000) {
+		cmdbuf[cmdlen++] = 0;
+		cmdbuf[cmdlen++] = 0;
+	}
+	cmdbuf[cmdlen++] = 0x03;  /* Number of commands */
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_ERROR;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_MECHA;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_TEMP;
 
 	if ((ret = send_data(ctx->conn,
-			     cmdbuf, sizeof(cmdbuf))))
+			     cmdbuf, cmdlen)))
 		return ret;
 	memset(resp, 0, sizeof(*resp));
 
@@ -552,20 +693,23 @@ static int mitsud90_query_status(struct mitsud90_ctx *ctx, struct mitsud90_statu
 static int mitsud90_query_fwver(struct mitsud90_ctx *ctx)
 {
 	uint8_t cmdbuf[8];
+	uint8_t cmdlen = 0;
 	int ret, num;
 	struct mitsud90_fwver_resp resp;
 
-	cmdbuf[0] = 0x1b;
-	cmdbuf[1] = 0x47;
-	cmdbuf[2] = 0x44;
-	cmdbuf[3] = 0x30;
-	cmdbuf[4] = 0;
-	cmdbuf[5] = 0;
-	cmdbuf[6] = 1;  /* Number of commands */
-	cmdbuf[7] = COM_STATUS_TYPE_FW_MA;
+	cmdbuf[cmdlen++] = 0x1b;
+	cmdbuf[cmdlen++] = 0x47;
+	cmdbuf[cmdlen++] = 0x44;
+	cmdbuf[cmdlen++] = 0x30;
+	if (ctx->conn->type != P_MITSU_W5000) {
+		cmdbuf[cmdlen++] = 0;
+		cmdbuf[cmdlen++] = 0;
+	}
+	cmdbuf[cmdlen++] = 1;  /* Number of commands */
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_FW_MAIN;
 
 	if ((ret = send_data(ctx->conn,
-			     cmdbuf, sizeof(cmdbuf))))
+			     cmdbuf, cmdlen)))
 		return ret;
 	memset(&resp, 0, sizeof(resp));
 
@@ -579,39 +723,69 @@ static int mitsud90_query_fwver(struct mitsud90_ctx *ctx)
 	return CUPS_BACKEND_OK;
 }
 
+static int mitsuw5k_get_serno(struct mitsud90_ctx *ctx)
+{
+	uint8_t cmdbuf[12];
+	uint8_t cmdlen = 0;
+	int ret, num;
+	struct mitsud90_fwver_resp resp;
+
+	cmdbuf[cmdlen++] = 0x1b;
+	cmdbuf[cmdlen++] = 0x47;
+	cmdbuf[cmdlen++] = 0x44;
+	cmdbuf[cmdlen++] = 0x30;
+	cmdbuf[cmdlen++] = 1;  /* Number of commands */
+	cmdbuf[cmdlen++] = W5K_STATUS_TYPE_SERIAL;
+
+	if ((ret = send_data(ctx->conn,
+			     cmdbuf, cmdlen)))
+		return ret;
+	memset(&resp, 0, sizeof(resp));
+
+	ret = read_data(ctx->conn,
+			cmdbuf, sizeof(cmdbuf), &num);
+
+	memcpy(ctx->serno, cmdbuf + 4, sizeof(cmdbuf)-4);
+	ctx->serno[sizeof(cmdbuf)-4-1] = 0;
+
+	return CUPS_BACKEND_OK;
+}
+
+
 static int mitsud90_get_serno(struct mitsud90_ctx *ctx)
 {
 	uint8_t cmdbuf[32];
+	uint8_t cmdlen = 0;
 	int ret, num;
 
 	/* Send Request */
-	cmdbuf[0] = 0x1b;
-	cmdbuf[1] = 0x61;
-	cmdbuf[2] = 0x36;
-	cmdbuf[3] = 0x36;
-	cmdbuf[4] = 0x41;
-	cmdbuf[5] = 0xbe;
-	cmdbuf[6] = 0x00;
-	cmdbuf[7] = 0x00;
+	cmdbuf[cmdlen++] = 0x1b;
+	cmdbuf[cmdlen++] = 0x61;
+	cmdbuf[cmdlen++] = 0x36;
+	cmdbuf[cmdlen++] = 0x36;
+	cmdbuf[cmdlen++] = 0x41;
+	cmdbuf[cmdlen++] = 0xbe;
+	cmdbuf[cmdlen++] = 0x00;
+	cmdbuf[cmdlen++] = 0x00;
 
-	cmdbuf[8] = 0x00;
-	cmdbuf[9] = 0x06;
-	cmdbuf[10] = 0x00;
-	cmdbuf[11] = 0x00;
-	cmdbuf[12] = 0x00;
-	cmdbuf[13] = 0x30;
-	cmdbuf[14] = 0xff;
-	cmdbuf[15] = 0xff;
+	cmdbuf[cmdlen++] = 0x00;
+	cmdbuf[cmdlen++] = 0x06;
+	cmdbuf[cmdlen++] = 0x00;
+	cmdbuf[cmdlen++] = 0x00;
+	cmdbuf[cmdlen++] = 0x00;
+	cmdbuf[cmdlen++] = 0x30;
+	cmdbuf[cmdlen++] = 0xff;
+	cmdbuf[cmdlen++] = 0xff;
 
-	cmdbuf[16] = 0xff;
-	cmdbuf[17] = 0xf9;
-	cmdbuf[18] = 0xff;
-	cmdbuf[19] = 0xff;
-	cmdbuf[20] = 0xff;
-	cmdbuf[21] = 0xcf;
+	cmdbuf[cmdlen++] = 0xff;
+	cmdbuf[cmdlen++] = 0xf9;
+	cmdbuf[cmdlen++] = 0xff;
+	cmdbuf[cmdlen++] = 0xff;
+	cmdbuf[cmdlen++] = 0xff;
+	cmdbuf[cmdlen++] = 0xcf;
 
 	if ((ret = send_data(ctx->conn,
-			     cmdbuf, 22)))
+			     cmdbuf, cmdlen)))
 		return ret;
 
 	ret = read_data(ctx->conn,
@@ -650,8 +824,13 @@ static int mitsud90_attach(void *vctx, struct dyesub_connection *conn, uint8_t j
 	if (test_mode < TEST_MODE_NOATTACH) {
 		if (mitsud90_query_media(ctx, &mresp))
 			return CUPS_BACKEND_FAILED;
-		if (mitsud90_get_serno(ctx))
-			return CUPS_BACKEND_FAILED;
+		if (ctx->conn->type == P_MITSU_W5000) {
+			if (mitsuw5k_get_serno(ctx))
+				return CUPS_BACKEND_FAILED;
+		} else {
+			if (mitsud90_get_serno(ctx))
+				return CUPS_BACKEND_FAILED;
+		}
 		if (mitsud90_query_fwver(ctx))
 			return CUPS_BACKEND_FAILED;
 	} else {
@@ -683,6 +862,7 @@ static int mitsud90_attach(void *vctx, struct dyesub_connection *conn, uint8_t j
 	// if nothing else, D90 v2.10 is needed for panorama.
 	// D90DW-P and D90DW share same USB VID/PID.  Not sure how to tell
 	// them apart other than FW.  No idea what functional differences are.
+	// W5000 MA:53C21S T:55A21@ F:369B21
 
 	return CUPS_BACKEND_OK;
 }
@@ -716,7 +896,10 @@ static void mitsud90_cleanup_job(const void *vjob)
 
 /* Sanity check some stuff */
 STATIC_ASSERT(sizeof(struct mitsud90_job_hdr) == 512);
+STATIC_ASSERT(sizeof(struct mitsud90_memcheck) == 512);
 STATIC_ASSERT(sizeof(struct mitsud90_plane_hdr) == 512);
+STATIC_ASSERT(sizeof(struct mitsuw5k_plane_hdr) == 512);
+STATIC_ASSERT(sizeof(struct mitsuw5k_job_hdr) == 512);
 
 static int mitsud90_main_loop(void *vctx, const void *vjob, int wait_for_return);
 
@@ -864,12 +1047,29 @@ static int mitsud90_read_parse(void *vctx, const void **vjob, int data_fd, int c
 		/* See if it's a special gutenprint "not-raw" job */
 		job->is_raw = !job->hdr.zero_b[3];
 		job->hdr.zero_b[3] = 0;
-	} else {
+	} else if (ctx->conn->type == P_MITSU_D90) {
 		if (job->hdr.zero_b[3] && job->hdr.pano.on == 0x03) {
 			job->is_pano = 1;
 			job->hdr.zero_b[3] = 0;
 			job->hdr.pano.on = 0x01;
 		}
+	} else if (ctx->conn->type == P_MITSU_W5000) {
+		struct mitsuw5k_job_hdr *hdr = (struct mitsuw5k_job_hdr*) &job->hdr;
+
+		remain = be16_to_cpu(hdr->cols) * be16_to_cpu(hdr->rows) * 3;
+		if (job->is_raw)
+			remain *= 2;
+
+		/* Add in the plane header */
+		remain += sizeof(struct mitsuw5k_plane_hdr);
+
+		if (!hdr->single)
+			job->is_duplex = 1;
+
+		/* Note the job has an OPTIONAL start block.
+		   We check for that later */
+
+		goto read_data;
 	}
 
 	/* Sanity check panorama parameters */
@@ -927,6 +1127,7 @@ static int mitsud90_read_parse(void *vctx, const void **vjob, int data_fd, int c
 	/* Add in the plane header */
 	remain += sizeof(struct mitsud90_plane_hdr);
 
+read_data:
 	/* Allocate ourselves a payload buffer */
 	job->databuf = malloc(remain + 1024);
 	if (!job->databuf) {
@@ -962,17 +1163,47 @@ static int mitsud90_read_parse(void *vctx, const void **vjob, int data_fd, int c
 		return CUPS_BACKEND_CANCEL;
 	}
 
-	/* See if this is a job footer.  If it is, keep, else holdover. */
-	if (job->footer.hdr[0] != 0x1b ||
-	    job->footer.hdr[1] != 0x42 ||
-	    job->footer.hdr[2] != 0x51 ||
-	    job->footer.hdr[3] != 0x31) {
-		memcpy(&ctx->holdover, &job->footer, sizeof(job->footer));
-	        ctx->holdover_on = 1;
-		// XXX generate a footer!
+	if (ctx->conn->type == P_MITSU_W5000) {
+		if (job->footer.hdr[0] != 0x1b ||
+		    job->footer.hdr[1] != 0x5a ||
+		    job->footer.hdr[2] != 0x54 ||
+		    job->footer.hdr[3] != 0x01) {
+			memcpy(&ctx->holdover, &job->footer, sizeof(job->footer));
+		        ctx->holdover_on = 1;
+		} else {
+			uint8_t tmpbuf[512];
+			job->has_start = 1;
+			ctx->holdover_on = 0;
+
+			/* read in remaining footer and discard */
+			remain = sizeof(tmpbuf)-sizeof(job->footer);
+			while(remain) {
+				i = read(data_fd, tmpbuf, remain);
+				if (i == 0) {
+					mitsud90_cleanup_job(job);
+					return CUPS_BACKEND_CANCEL;
+				}
+				if (i < 0) {
+					mitsud90_cleanup_job(job);
+					return CUPS_BACKEND_CANCEL;
+				}
+				job->datalen += i;
+				remain -= i;
+			}
+		}
 	} else {
-		job->has_footer = 1;
-		ctx->holdover_on = 0;
+		/* See if this is a job footer.  If it is, keep, else holdover. */
+		if (job->footer.hdr[0] != 0x1b ||
+		    job->footer.hdr[1] != 0x42 ||
+		    job->footer.hdr[2] != 0x51 ||
+		    job->footer.hdr[3] != 0x31) {
+			memcpy(&ctx->holdover, &job->footer, sizeof(job->footer));
+		        ctx->holdover_on = 1;
+			// XXX generate a footer!
+		} else {
+			job->has_footer = 1;
+			ctx->holdover_on = 0;
+		}
 	}
 
 	/* CP-M1 has... other considerations */
@@ -1258,8 +1489,8 @@ top:
 		}
 	} while(1);
 
-	/* Send memory check */
-	{
+	/* Send memory check, but NOT on W5000 */
+	if (ctx->conn->type != P_MITSU_W5000) {
 		struct mitsud90_memcheck mem;
 		struct mitsud90_memcheck_resp mem_resp;
 		int num;
@@ -1284,7 +1515,7 @@ top:
 			return 4;
 		}
 		if (mem_resp.size_bad || mem_resp.mem_bad == 0xff) {
-			ERROR("Printer reported bad print params (%02x)\n", mem_resp.size_bad);
+			ERROR("Printer reported bad print params (%02x/%02x)\n", mem_resp.size_bad, mem_resp.mem_bad);
 			return CUPS_BACKEND_CANCEL;
 		}
 		if (mem_resp.mem_bad) {
@@ -1311,8 +1542,29 @@ top:
 		return CUPS_BACKEND_FAILED;
 //	sent += (job->datalen - sent);
 
-	/* Send job footer */
-	if (job->has_footer) {
+	if (ctx->conn->type == P_MITSU_W5000) {
+		/* Duplex handling */
+		if (job->is_duplex) {
+			ctx->duplex_on++;
+			copies = 1;
+		}
+
+		if (ctx->duplex_on == 2)
+			ctx->duplex_on = 0;
+
+		if (!ctx->duplex_on || job->has_start) {
+			/* Sent job START */
+			struct mitsuw5k_plane_hdr start = {
+				.hdr = { 0x1b, 0x5a, 0x54, 0x01 },
+				.printout = 1
+			};
+			if ((ret = send_data(ctx->conn,
+			     (uint8_t*)&start, sizeof(start))))
+				return CUPS_BACKEND_FAILED;
+		} else {
+			goto skip_duplex;
+		}
+	} else if (job->has_footer) {
 		if ((ret = send_data(ctx->conn,
 				     (uint8_t*) &job->footer, sizeof(job->footer))))
 			return CUPS_BACKEND_FAILED;
@@ -1364,6 +1616,7 @@ top:
 		goto top;
 	}
 
+skip_duplex:
 	return CUPS_BACKEND_OK;
 }
 
@@ -1373,6 +1626,7 @@ static int mitsud90_query_job(struct mitsud90_ctx *ctx, uint16_t jobid,
 	struct mitsud90_job_query req;
 	int ret, num;
 
+	// XXX does this work on W5000?
 	req.hdr[0] = 0x1b;
 	req.hdr[1] = 0x47;
 	req.hdr[2] = 0x44;
@@ -1442,43 +1696,46 @@ static int mitsud90_get_status(struct mitsud90_ctx *ctx)
 static int mitsud90_get_info(struct mitsud90_ctx *ctx)
 {
 	uint8_t cmdbuf[26];
+	uint8_t cmdlen = 0;
 	int ret, num;
 	struct mitsud90_info_resp resp;
 
-	cmdbuf[0] = 0x1b;
-	cmdbuf[1] = 0x47;
-	cmdbuf[2] = 0x44;
-	cmdbuf[3] = 0x30;
-	cmdbuf[4] = 0;
-	cmdbuf[5] = 0;
-	cmdbuf[6] = 19;  /* Number of commands */
+	cmdbuf[cmdlen++] = 0x1b;
+	cmdbuf[cmdlen++] = 0x47;
+	cmdbuf[cmdlen++] = 0x44;
+	cmdbuf[cmdlen++] = 0x30;
+	if (ctx->conn->type != P_MITSU_W5000) {
+		cmdbuf[cmdlen++] = 0;
+		cmdbuf[cmdlen++] = 0;
+	}
+	cmdbuf[cmdlen++] = 19;  /* Number of commands */
 
-	cmdbuf[7] = COM_STATUS_TYPE_MODEL;
-	cmdbuf[8] = COM_STATUS_TYPE_x02;
-	cmdbuf[9] = COM_STATUS_TYPE_FW_0b;
-	cmdbuf[10] = COM_STATUS_TYPE_FW_MA;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_MODEL;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_x02;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_FW_LOADER;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_FW_MAIN;
 
-	cmdbuf[11] = COM_STATUS_TYPE_FW_F;
-	cmdbuf[12] = COM_STATUS_TYPE_FW_T;
-	cmdbuf[13] = COM_STATUS_TYPE_FW_0f;
-	cmdbuf[14] = COM_STATUS_TYPE_FW_11;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_FW_F;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_FW_T;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_FW_TAG;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_FW_SATIN;
 
-	cmdbuf[15] = COM_STATUS_TYPE_FW_ME;
-	cmdbuf[16] = COM_STATUS_TYPE_x1e;
-	cmdbuf[17] = COM_STATUS_TYPE_x22;
-	cmdbuf[18] = COM_STATUS_TYPE_x28;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_FW_ME;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_x1e;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_x22;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_x28;
 
-	cmdbuf[19] = COM_STATUS_TYPE_x29;
-	cmdbuf[20] = COM_STATUS_TYPE_x2b;
-	cmdbuf[21] = COM_STATUS_TYPE_x2c;
-	cmdbuf[22] = COM_STATUS_TYPE_x65;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_INKID;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_x2b;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_x2c;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_x65;
 
-	cmdbuf[23] = D90_STATUS_TYPE_ISEREN;
-	cmdbuf[24] = COM_STATUS_TYPE_x83;
-	cmdbuf[25] = D90_STATUS_TYPE_x84;
+	cmdbuf[cmdlen++] = D90_STATUS_TYPE_ISEREN;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_x83;
+	cmdbuf[cmdlen++] = D90_STATUS_TYPE_x84;
 
 	if ((ret = send_data(ctx->conn,
-			     cmdbuf, sizeof(cmdbuf))))
+			     cmdbuf, cmdlen)))
 		return ret;
 	memset(&resp, 0, sizeof(resp));
 
@@ -1507,9 +1764,9 @@ static int mitsud90_get_info(struct mitsud90_ctx *ctx)
 	INFO("TYPE_1e: %02x\n", resp.x1e);
 	INFO("TYPE_22: %02x %02x\n", resp.x22[0], resp.x22[1]);
 	INFO("TYPE_28: %04x\n", be16_to_cpu(resp.x28));
-	INFO("TYPE_29: %02x %02x %02x %02x %02x %02x %02x %02x\n",
-	     resp.x29[0], resp.x29[1], resp.x29[2], resp.x29[3],
-	     resp.x29[4], resp.x29[5], resp.x29[6], resp.x29[7]);
+	INFO("Ink ID: %02x %02x %02x %02x %02x %02x %02x %02x\n",
+	     resp.inkid[0], resp.inkid[1], resp.inkid[2], resp.inkid[3],
+	     resp.inkid[4], resp.inkid[5], resp.inkid[6], resp.inkid[7]);
 	INFO("TYPE_2b: %02x %02x\n", resp.x2b[0], resp.x2b[1]);
 	INFO("TYPE_2c: %02x %02x\n", resp.x2c[0], resp.x2c[1]);
 
@@ -1527,45 +1784,160 @@ static int mitsud90_get_info(struct mitsud90_ctx *ctx)
 	return CUPS_BACKEND_OK;
 }
 
+static int mitsuw5k_get_info(struct mitsud90_ctx *ctx)
+{
+	uint8_t cmdbuf[32];
+	uint8_t cmdlen = 0;
+	int ret, num;
+	struct mitsuw5k_info_resp resp;
+
+	cmdbuf[cmdlen++] = 0x1b;
+	cmdbuf[cmdlen++] = 0x47;
+	cmdbuf[cmdlen++] = 0x44;
+	cmdbuf[cmdlen++] = 0x30;
+	if (ctx->conn->type != P_MITSU_W5000) {
+		cmdbuf[cmdlen++] = 0;
+		cmdbuf[cmdlen++] = 0;
+	}
+	cmdbuf[cmdlen++] = 19;  /* Number of commands */
+
+	cmdbuf[cmdlen++] = W5K_STATUS_TYPE_MODEL;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_x02;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_FW_LOADER;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_FW_MAIN;
+
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_FW_F;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_FW_T;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_FW_TAG;
+	cmdbuf[cmdlen++] = W5K_STATUS_TYPE_FW_LUT;
+
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_FW_SATIN;
+	cmdbuf[cmdlen++] = W5K_STAUTS_TYPE_x1a;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_x1e;
+
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_INKID;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_x2b;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_x2c;
+	cmdbuf[cmdlen++] = W5K_STATUS_CNT_HEAD;
+
+	cmdbuf[cmdlen++] = W5K_STATUS_CNT_SERVICE;
+	cmdbuf[cmdlen++] = W5K_STATUS_CNT_PRINTED;
+	cmdbuf[cmdlen++] = W5K_STATUS_CNT_CUTTER;
+	cmdbuf[cmdlen++] = W5K_STATUS_CNT_SLITTER;
+
+#if 0
+	cmdbuf[cmdlen++] = W5K_STATUS_TYPE_x40;
+	cmdbuf[cmdlen++] = W5K_STATUS_TYPE_x45;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_x65;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_x83;
+	cmdbuf[cmdlen++] = D90_STATUS_TYPE_x84;
+#endif
+
+	if ((ret = send_data(ctx->conn,
+			     cmdbuf, cmdlen)))
+		return ret;
+	memset(&resp, 0, sizeof(resp));
+
+	ret = read_data(ctx->conn,
+			(uint8_t*) &resp, sizeof(resp), &num);
+
+	if (ret < 0)
+		return ret;
+	if (num != sizeof(resp)) {
+		ERROR("Short Read! (%d/%d)\n", num, (int)sizeof(resp));
+		return 4;
+	}
+
+	/* start dumping output */
+	memset(cmdbuf, 0, sizeof(cmdbuf));
+	memcpy(cmdbuf, resp.model, sizeof(resp.model));
+	INFO("Model: %s\n", (char*)cmdbuf);
+	INFO("Serial: %s\n", ctx->serno);
+	for (num = 0; num < 7 ; num++) {
+		memset(cmdbuf, 0, sizeof(cmdbuf));
+		memcpy(cmdbuf, resp.fw_vers[num].version, sizeof(resp.fw_vers[num].version));
+		INFO("FW Component %02d: %s (%04x)\n",
+		     num, cmdbuf, be16_to_cpu(resp.fw_vers[num].csum));
+	}
+	INFO("TYPE_02: %02x\n", resp.x02);
+	INFO("TYPE_1a: %02x\n", resp.x1a);
+	INFO("TYPE_1e: %02x\n", resp.x1e);
+	INFO("Ink ID: %02x %02x %02x %02x %02x %02x %02x %02x\n",
+	     resp.inkid[0], resp.inkid[1], resp.inkid[2], resp.inkid[3],
+	     resp.inkid[4], resp.inkid[5], resp.inkid[6], resp.inkid[7]);
+	INFO("TYPE_2b: %02x %02x %02x %02x %02x %02x %02x %02x\n",
+	     resp.x2b[0], resp.x2b[1], resp.x2b[2], resp.x2b[3],
+	     resp.x2b[4], resp.x2b[5], resp.x2b[6], resp.x2b[7]);
+	INFO("TYPE_2c: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+	     resp.x2c[0], resp.x2c[1], resp.x2c[2], resp.x2c[3],
+	     resp.x2c[4], resp.x2c[5], resp.x2c[6], resp.x2c[7],
+	     resp.x2c[8], resp.x2c[9], resp.x2c[10], resp.x2c[11]);
+
+	INFO("Head Count: %u\n", be32_to_cpu(resp.cnt_head));
+	INFO("Service Count: %u\n", be32_to_cpu(resp.cnt_service));
+	INFO("Print Count: %u\n", be32_to_cpu(resp.cnt_printed));
+	INFO("Cutter Count: %u\n", be32_to_cpu(resp.cnt_cutter));
+	INFO("Slitter Count: %u\n", be32_to_cpu(resp.cnt_slitter));
+
+#if 0
+	INFO("TYPE_40: %08x\n", be32_to_cpu(resp.x40));
+	INFO("TYPE_45: %08x\n", be32_to_cpu(resp.x45));
+	INFO("TYPE_65:");
+	for (num = 0; num < 54 ; num++) {
+		DEBUG2(" %02x", resp.x65[num]);
+	}
+	DEBUG2("\n");
+	INFO("TYPE_83: %02x %02x\n", resp.x83[0], resp.x83[1]);
+	INFO("TYPE_84: %02x %02x\n", resp.x84[1], resp.x84[2]);
+#endif
+
+	// XXX what about resume, wait time, "cut limit", sleep time ?
+
+	return CUPS_BACKEND_OK;
+}
+
 static int mitsum1_get_info(struct mitsud90_ctx *ctx)
 {
 	uint8_t cmdbuf[25];
+	uint8_t cmdlen = 0;
 	int ret, num;
 	struct mitsum1_info_resp resp;
 
-	cmdbuf[0] = 0x1b;
-	cmdbuf[1] = 0x47;
-	cmdbuf[2] = 0x44;
-	cmdbuf[3] = 0x30;
-	cmdbuf[4] = 0;
-	cmdbuf[5] = 0;
-	cmdbuf[6] = 18;  /* Number of commands */
+	cmdbuf[cmdlen++] = 0x1b;
+	cmdbuf[cmdlen++] = 0x47;
+	cmdbuf[cmdlen++] = 0x44;
+	cmdbuf[cmdlen++] = 0x30;
+	if (ctx->conn->type != P_MITSU_W5000) {
+		cmdbuf[cmdlen++] = 0;
+		cmdbuf[cmdlen++] = 0;
+	}
+	cmdbuf[cmdlen++] = 18;  /* Number of commands */
 
-	cmdbuf[7] = COM_STATUS_TYPE_MODEL;
-	cmdbuf[8] = COM_STATUS_TYPE_x02;
-	cmdbuf[9] = CM1_STATUS_TYPE_FW_0a;
-	cmdbuf[10] = COM_STATUS_TYPE_FW_0b;
-	cmdbuf[11] = COM_STATUS_TYPE_FW_MA;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_MODEL;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_x02;
+	cmdbuf[cmdlen++] = CM1_STATUS_TYPE_FW_0a;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_FW_LOADER;
 
-	cmdbuf[12] = COM_STATUS_TYPE_FW_F;
-	cmdbuf[13] = COM_STATUS_TYPE_FW_T;
-	cmdbuf[14] = COM_STATUS_TYPE_FW_0f;
-	cmdbuf[15] = COM_STATUS_TYPE_FW_11;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_FW_MAIN;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_FW_F;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_FW_T;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_FW_TAG;
 
-	cmdbuf[16] = COM_STATUS_TYPE_FW_ME;
-	cmdbuf[17] = COM_STATUS_TYPE_x1e;
-	cmdbuf[18] = COM_STATUS_TYPE_x22;
-	cmdbuf[19] = COM_STATUS_TYPE_x28;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_FW_SATIN;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_FW_ME;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_x1e;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_x22;
 
-	cmdbuf[20] = COM_STATUS_TYPE_x29;
-	cmdbuf[21] = COM_STATUS_TYPE_x2b;
-	cmdbuf[22] = COM_STATUS_TYPE_x2c;
-	cmdbuf[23] = COM_STATUS_TYPE_x65;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_x28;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_INKID;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_x2b;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_x2c;
 
-	cmdbuf[24] = COM_STATUS_TYPE_x83;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_x65;
+	cmdbuf[cmdlen++] = COM_STATUS_TYPE_x83;
 
 	if ((ret = send_data(ctx->conn,
-			     cmdbuf, sizeof(cmdbuf))))
+			     cmdbuf, cmdlen)))
 		return ret;
 	memset(&resp, 0, sizeof(resp));
 
@@ -1594,9 +1966,9 @@ static int mitsum1_get_info(struct mitsud90_ctx *ctx)
 	INFO("TYPE_1e: %02x\n", resp.x1e);
 	INFO("TYPE_22: %02x %02x\n", resp.x22[0], resp.x22[1]);
 	INFO("TYPE_28: %04x\n", be16_to_cpu(resp.x28));
-	INFO("TYPE_29: %02x %02x %02x %02x %02x %02x %02x %02x\n",
-	     resp.x29[0], resp.x29[1], resp.x29[2], resp.x29[3],
-	     resp.x29[4], resp.x29[5], resp.x29[6], resp.x29[7]);
+	INFO("Ink ID: %02x %02x %02x %02x %02x %02x %02x %02x\n",
+	     resp.inkid[0], resp.inkid[1], resp.inkid[2], resp.inkid[3],
+	     resp.inkid[4], resp.inkid[5], resp.inkid[6], resp.inkid[7]);
 	INFO("TYPE_2b: %02x %02x\n", resp.x2b[0], resp.x2b[1]);
 	INFO("TYPE_2c: %02x %02x\n", resp.x2c[0], resp.x2c[1]);
 
@@ -1616,23 +1988,26 @@ static int mitsud90_dumpall(struct mitsud90_ctx *ctx)
 {
 	int i;
 	uint8_t cmdbuf[8];
+	uint8_t cmdlen = 0;
 	uint8_t buf[256];
 
-	cmdbuf[0] = 0x1b;
-	cmdbuf[1] = 0x47;
-	cmdbuf[2] = 0x44;
-	cmdbuf[3] = 0x30;
-	cmdbuf[4] = 0;
-	cmdbuf[5] = 0;
-	cmdbuf[6] = 0x01;  /* Number of commands */
+	cmdbuf[cmdlen++] = 0x1b;
+	cmdbuf[cmdlen++] = 0x47;
+	cmdbuf[cmdlen++] = 0x44;
+	cmdbuf[cmdlen++] = 0x30;
+	if (ctx->conn->type != P_MITSU_W5000) {
+		cmdbuf[cmdlen++] = 0;
+		cmdbuf[cmdlen++] = 0;
+	}
+	cmdbuf[cmdlen++] = 1;  /* Number of commands */
 
 	for (i = 0 ; i < 256 ; i++) {
 		int num, ret;
 
-		cmdbuf[7] = i;
+		cmdbuf[cmdlen] = i;
 
 		if ((ret = send_data(ctx->conn,
-				     cmdbuf, sizeof(cmdbuf))))
+				     cmdbuf, cmdlen + 1)))
 			return ret;
 		memset(buf, 0, sizeof(buf));
 
@@ -1660,6 +2035,8 @@ static int mitsud90_test_print(struct mitsud90_ctx *ctx, int type)
 	uint8_t cmdbuf[16];
 	int ret, num = 0;
 	uint8_t resp[256];
+
+	// XXX does this work on W5000?
 
 	/* Send Test ON */
 	memset(cmdbuf, 0, 8);
@@ -1763,7 +2140,10 @@ static int mitsud90_query_serno(struct dyesub_connection *conn, char *buf, int b
 
 	UNUSED(buf_len);
 
-	ret = mitsud90_get_serno(&ctx);
+	if (conn->type == P_MITSU_W5000)
+		ret = mitsuw5k_get_serno(&ctx);
+	else
+		ret = mitsud90_get_serno(&ctx);
 
 	/* Copy it */
 	memcpy(buf, ctx.serno, sizeof(ctx.serno));
@@ -1773,39 +2153,42 @@ static int mitsud90_query_serno(struct dyesub_connection *conn, char *buf, int b
 static int mitsud90_set_iserial(struct mitsud90_ctx *ctx, uint8_t enabled)
 {
 	uint8_t cmdbuf[23];
+	uint8_t cmdlen = 0;
 	int ret, num;
+
+	// XXX DOES NOT WORK ON W5K
 
 	enabled = (enabled) ? 0: 0x80;
 
 	/* Send Parameter.. */
-	cmdbuf[0] = 0x1b;
-	cmdbuf[1] = 0x31;
-	cmdbuf[2] = 0x36;
-	cmdbuf[3] = 0x30;
-	cmdbuf[4] = 0x41;
-	cmdbuf[5] = 0xbe;
-	cmdbuf[6] = 0x00;
-	cmdbuf[7] = 0x00;
+	cmdbuf[cmdlen++] = 0x1b;
+	cmdbuf[cmdlen++] = 0x31;
+	cmdbuf[cmdlen++] = 0x36;
+	cmdbuf[cmdlen++] = 0x30;
+	cmdbuf[cmdlen++] = 0x41;
+	cmdbuf[cmdlen++] = 0xbe;
+	cmdbuf[cmdlen++] = 0x00;
+	cmdbuf[cmdlen++] = 0x00;
 
-	cmdbuf[8] = 0x00;
-	cmdbuf[9] = 0x01;
-	cmdbuf[10] = 0x00;
-	cmdbuf[11] = 0x00;
-	cmdbuf[12] = 0x00;
-	cmdbuf[13] = 0x11;
-	cmdbuf[14] = 0xff;
-	cmdbuf[15] = 0xff;
+	cmdbuf[cmdlen++] = 0x00;
+	cmdbuf[cmdlen++] = 0x01;
+	cmdbuf[cmdlen++] = 0x00;
+	cmdbuf[cmdlen++] = 0x00;
+	cmdbuf[cmdlen++] = 0x00;
+	cmdbuf[cmdlen++] = 0x11;
+	cmdbuf[cmdlen++] = 0xff;
+	cmdbuf[cmdlen++] = 0xff;
 
-	cmdbuf[16] = 0xff;
-	cmdbuf[17] = 0xfe;
-	cmdbuf[18] = 0xff;
-	cmdbuf[19] = 0xff;
-	cmdbuf[20] = 0xff;
-	cmdbuf[21] = 0xfe;
-	cmdbuf[22] = enabled;
+	cmdbuf[cmdlen++] = 0xff;
+	cmdbuf[cmdlen++] = 0xfe;
+	cmdbuf[cmdlen++] = 0xff;
+	cmdbuf[cmdlen++] = 0xff;
+	cmdbuf[cmdlen++] = 0xff;
+	cmdbuf[cmdlen++] = 0xfe;
+	cmdbuf[cmdlen++] = enabled;
 
 	if ((ret = send_data(ctx->conn,
-			     cmdbuf, sizeof(cmdbuf))))
+			     cmdbuf, cmdlen)))
 		return ret;
 
 	ret = read_data(ctx->conn,
@@ -1817,42 +2200,45 @@ static int mitsud90_set_iserial(struct mitsud90_ctx *ctx, uint8_t enabled)
 static int mitsud90_set_sleeptime(struct mitsud90_ctx *ctx, uint16_t time)
 {
 	uint8_t cmdbuf[24];
+	uint8_t cmdlen = 0;
 	int ret;
 
 	/* 255 minutes max, according to RE work */
 	if (time > 255)
 		time = 255;
 
+	// XXX does this work on W5000?
+
 	/* Send Parameter.. */
-	cmdbuf[0] = 0x1b;
-	cmdbuf[1] = 0x31;
-	cmdbuf[2] = 0x36;
-	cmdbuf[3] = 0x30;
-	cmdbuf[4] = 0x41;
-	cmdbuf[5] = 0xbe;
-	cmdbuf[6] = 0x00;
-	cmdbuf[7] = 0x00;
+	cmdbuf[cmdlen++] = 0x1b;
+	cmdbuf[cmdlen++] = 0x31;
+	cmdbuf[cmdlen++] = 0x36;
+	cmdbuf[cmdlen++] = 0x30;
+	cmdbuf[cmdlen++] = 0x41;
+	cmdbuf[cmdlen++] = 0xbe;
+	cmdbuf[cmdlen++] = 0x00;
+	cmdbuf[cmdlen++] = 0x00;
 
-	cmdbuf[8] = 0x00;
-	cmdbuf[9] = 0x02;
-	cmdbuf[10] = 0x00;
-	cmdbuf[11] = 0x00;
-	cmdbuf[12] = 0x05;
-	cmdbuf[13] = 0x02;
-	cmdbuf[14] = 0xff;
-	cmdbuf[15] = 0xff;
+	cmdbuf[cmdlen++] = 0x00;
+	cmdbuf[cmdlen++] = 0x02;
+	cmdbuf[cmdlen++] = 0x00;
+	cmdbuf[cmdlen++] = 0x00;
+	cmdbuf[cmdlen++] = 0x05;
+	cmdbuf[cmdlen++] = 0x02;
+	cmdbuf[cmdlen++] = 0xff;
+	cmdbuf[cmdlen++] = 0xff;
 
-	cmdbuf[16] = 0xff;
-	cmdbuf[17] = 0xfd;
-	cmdbuf[18] = 0xff;
-	cmdbuf[19] = 0xff;
-	cmdbuf[20] = 0xfa;
-	cmdbuf[21] = 0xff;
-	cmdbuf[22] = (time >> 8) & 0xff;
-	cmdbuf[23] = time & 0xff;
+	cmdbuf[cmdlen++] = 0xff;
+	cmdbuf[cmdlen++] = 0xfd;
+	cmdbuf[cmdlen++] = 0xff;
+	cmdbuf[cmdlen++] = 0xff;
+	cmdbuf[cmdlen++] = 0xfa;
+	cmdbuf[cmdlen++] = 0xff;
+	cmdbuf[cmdlen++] = (time >> 8) & 0xff;
+	cmdbuf[cmdlen++] = time & 0xff;
 
 	if ((ret = send_data(ctx->conn,
-			     cmdbuf, 4)))
+			     cmdbuf, cmdlen)))
 		return ret;
 
 	/* No response */
@@ -1867,7 +2253,7 @@ static void mitsud90_cmdline(void)
 	DEBUG("\t\t[ -k time ]      # Set sleep time in minutes\n");
 	DEBUG("\t\t[ -m ]           # Query printer media\n");
 	DEBUG("\t\t[ -s ]           # Query printer status\n");
-	DEBUG("\t\t[ -x 0|1 ]       # Enable/disable iSerial reporting\n");
+	DEBUG("\t\t[ -x 0|1 ]       # Enable/disable iSerial reporting (D90 only)\n");
 //	DEBUG("\t\t[ -T 0-9 ]       # Test print\n");
 //	DEBUG("\t\t[ -Z ]           # Dump all parameters\n");
 }
@@ -1884,10 +2270,18 @@ static int mitsud90_cmdline_arg(void *vctx, int argc, char **argv)
 		switch(i) {
 		GETOPT_PROCESS_GLOBAL
 		case 'i':
-			if (ctx->conn->type == P_MITSU_D90)
-				j = mitsud90_get_info(ctx);
-			else
+			switch (ctx->conn->type) {
+			case P_MITSU_M1:
 				j = mitsum1_get_info(ctx);
+				break;
+			case P_MITSU_W5000:
+				j = mitsuw5k_get_info(ctx);
+				break;
+			case P_MITSU_D90:
+			default:
+				j = mitsud90_get_info(ctx);
+				break;
+			}
 			break;
 		case 'j':
 			j = mitsud90_get_jobstatus(ctx, atoi(optarg));
@@ -1956,12 +2350,17 @@ static int mitsud90_query_stats(void *vctx, struct printerstats *stats)
 		stats->mfg = "Mitsubishi";
 		stats->model = "CP-M1 family";
 		break;
+	case P_MITSU_W5000:
+		stats->mfg = "Mitsubishi";
+		stats->model = "CP-W5000 family";
+		break;
 	case P_FUJI_ASK500:
 		stats->mfg = "Fujifilm";
 		stats->model = "AK500";
 		break;
 	default:
 		stats->model = "Unknown!";
+		stats->mfg = "Unknown!";
 		break;
 	}
 
@@ -1997,8 +2396,8 @@ static const char *mitsud90_prefixes[] = {
 
 /* Exported */
 const struct dyesub_backend mitsud90_backend = {
-	.name = "Mitsubishi CP-D90/CP-M1",
-	.version = "0.37"  " (lib " LIBMITSU_VER ")",
+	.name = "Mitsubishi CP-D90/CP-M1/CP-W5000",
+	.version = "0.44"  " (lib " LIBMITSU_VER ")",
 	.uri_prefixes = mitsud90_prefixes,
 	.cmdline_arg = mitsud90_cmdline_arg,
 	.cmdline_usage = mitsud90_cmdline,
@@ -2015,6 +2414,7 @@ const struct dyesub_backend mitsud90_backend = {
 		{ 0x06d3, 0x3b60, P_MITSU_D90, NULL, "mitsubishi-d90dw"},
 		{ 0x06d3, 0x3b80, P_MITSU_M1, NULL, "mitsubishi-cpm1"},
 		{ 0x06d3, 0x3b80, P_MITSU_M1, NULL, "mitsubishi-cpm15"}, // Duplicate for the M15
+		{ 0x06d3, 0x3b50, P_MITSU_W5000, NULL, "mitsubishi-cpw5000"},
 //		{ 0x04cb, 0x1234, P_FUJI_ASK500, NULL, "fujifilm-ask500"},
 		{ 0, 0, 0, NULL, NULL}
 	}
@@ -2022,14 +2422,19 @@ const struct dyesub_backend mitsud90_backend = {
 
 /* ToDo:
 
-     * consolidate M1 vs D90 info query/dump more efficiently
+     * consolidate M1 vs D90 vs W5000 info query/dump more efficiently?
      * job control (job id, active job, buffer status, etc)
      * any sort of counters
      * sleep and waking up
      * cut limit?
-     * Validate Fujifilm ASK500 support
-     * Confirm ASK500 spool format
+     * Validate Fujifilm ASK500 support & spool format (likely moot now)
      * Validate Panorama mode
+     * W5000 validate media type vs loaded LUT, if possible?
+        Non-HG media:
+          e0 07 00 00 00 eb e8 de bd / 18 a1  (00192 061 / 15962 078) LUT SLTAX270
+	HG media:
+	  ??? LUT SLTA7180
+     * Job combining (esp for W5000)
 
  */
 

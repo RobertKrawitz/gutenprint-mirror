@@ -312,11 +312,13 @@ const char *mitsu_media_types(int printer, uint8_t brand, uint8_t type)
 			return "CK-D769 (6x9)";
 		else if (type == 0x0f)
 			return "CK-D768 (6x8)";
-	} else if (brand == 0x61) { /* Mitsubishi (K60 series) */
+	} else if (brand == 0x61) { /* Mitsubishi (K60 series & W5000 series) */
 		if (type == 0x84)
 			return "CK-K57R (5x7)";
 		else if (type == 0x8f)
 			return "CK-K76R (6x8)";
+		else if (type == 0xb2)
+			return "PK58125 + CK5000";
 	} else if (brand == 0x6c) { /* Kodak */
 		if (type == 0x84)
 			return "Kodak 5R (5x7)";
