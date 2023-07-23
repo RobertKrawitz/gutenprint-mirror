@@ -114,6 +114,7 @@ int mitsu_loadlib(struct mitsu_lib *lib, int type)
 		break;
 	case P_MITSU_D70X:
 	case P_FUJI_ASK300:
+	case P_DNP_DSX80:
 		lib->DoImageEffect = lib->DoImageEffect70;
 		break;
 	case P_MITSU_9800:
