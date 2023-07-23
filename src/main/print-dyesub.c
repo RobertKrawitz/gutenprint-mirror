@@ -11753,7 +11753,7 @@ static const dyesub_cap_t dyesub_model_capabilities[] =
     NULL, 0, NULL, NULL,
   },
   { /* DNP DS480 */
-    4119,
+    4121,
     &bgr_ink_list,
     &res_300dpi_list,
     &dnp_ds480_page_list,
@@ -11771,7 +11771,7 @@ static const dyesub_cap_t dyesub_model_capabilities[] =
     mitsu70x_parse_parameters,
   },
   { /* DNP DS680 */
-    4120,
+    4122,
     &bgr_ink_list,
     &res_300dpi_list,
     &dnp_ds680_page_list,
