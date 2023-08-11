@@ -46,8 +46,6 @@
 static int preview_size_vert = 360;
 static int preview_size_horiz = 300;
 static gdouble minimum_image_percent = 5.0;
-static const int thumbnail_hintw = 1024;
-static const int thumbnail_hinth = 1024;
 
 #define MOVE_CONSTRAIN	   0
 #define MOVE_HORIZONTAL	   1
@@ -154,7 +152,7 @@ static gint suppress_preview_update = 0;
 static gint suppress_preview_reset = 0;
 
 static GtkDrawingArea *preview = NULL;	/* Preview drawing area widget */
-static GtkDrawingArea *swatch = NULL;
+static GtkDrawingArea *swatch = NULL;  /* Color adjust thumbnail widget */
 static gint mouse_x, mouse_y;		/* Last mouse position */
 static gint orig_top, orig_left;	/* Original mouse position at start */
 static gint buttons_pressed = 0;
@@ -4415,12 +4413,20 @@ initialize_thumbnail(void)
   if (stpui_get_thumbnail_func())
     {
       const guchar *internal_thumbnail_data;
+
+      /*
+       * GIMP thumbnails are limited to 1024px
+       *
+       * Make sure we don't use more than 1/4th of the screen space
+       * so we have room for controls on the bottom.
+       */
+      thumbnail_w = gdk_screen_width()/4;
+      thumbnail_h = gdk_screen_height()/4;
+
       /*
        * Fetch a thumbnail of the image we're to print from the Gimp.
        */
 
-      thumbnail_w = thumbnail_hintw;
-      thumbnail_h = thumbnail_hinth;
       internal_thumbnail_data =
 	(stpui_get_thumbnail_func()) (stpui_get_thumbnail_data(), &thumbnail_w,
 				      &thumbnail_h, &thumbnail_bpp, 0);
