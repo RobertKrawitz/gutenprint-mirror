@@ -402,7 +402,6 @@ static void setup_paper_codes(void)
 			selphy_printers[i].paper_codes[0x00] = 0x11;
 			selphy_printers[i].paper_codes[0x01] = 0x22;
 			selphy_printers[i].paper_codes[0x02] = 0x33;
-			selphy_printers[i].paper_codes[0x03] = 0x44;
 			break;
 		case P_CPGENERIC:
 			selphy_printers[i].paper_codes[0x01] = 0x11;
@@ -411,10 +410,10 @@ static void setup_paper_codes(void)
 			selphy_printers[i].paper_codes[0x04] = 0x44;
 			break;
 		case P_CP790:
-			selphy_printers[i].paper_codes[0x00] = 0x0;
-			selphy_printers[i].paper_codes[0x01] = 0x1;
-			selphy_printers[i].paper_codes[0x02] = 0x2;
-			selphy_printers[i].paper_codes[0x03] = 0x3;
+			selphy_printers[i].paper_codes[0x00] = 0x00;
+			selphy_printers[i].paper_codes[0x01] = 0x01;
+			selphy_printers[i].paper_codes[0x02] = 0x02;
+			selphy_printers[i].paper_codes[0x03] = 0x03;
 			break;
 		case P_ES3_30:
 			/* N/A, printer does not report types */
@@ -881,33 +880,52 @@ top:
 
 		/* Make sure paper/ribbon is correct */
 		if (job->paper_code != -1) {
-			uint8_t ribbon = 0xff;
-			uint8_t paper = 0xff;
+			uint8_t ribbon, paper;
+			uint8_t job_ribbon = job->paper_code & 0x0f;
+			uint8_t job_paper = (job->paper_code >> 4) & 0xf;
 
-			if (ctx->conn->type == P_CPGENERIC) {
+			switch(ctx->conn->type) {
+			case P_CPGENERIC:
 				ribbon = rdbuf[ctx->printer->paper_code_offset] & 0xf;
 				paper = rdbuf[ctx->printer->paper_code_offset] >> 4;
-			} else if (ctx->conn->type == P_CP790) {
+				if (paper == 0x0) {
+					ERROR("No paper tray loaded, aborting!\n");
+					return CUPS_BACKEND_STOP;
+				}
+				if (ribbon == 0x0) {
+					ERROR("No ribbon loaded, aborting!\n");
+					return CUPS_BACKEND_STOP;
+				}
+				if (paper != job_paper) {
+					ERROR("Incorrect paper loaded (%02x vs %02x), aborting job!\n", paper, job_paper);
+					return CUPS_BACKEND_HOLD;
+				}
+				if (ribbon != job_ribbon) {
+					ERROR("Incorrect ribbon loaded (%02x vs %02x), aborting job!\n", ribbon, job_ribbon);
+					return CUPS_BACKEND_HOLD;
+				}
+				break;
+			case P_CP790:
 				ribbon = rdbuf[4] >> 4;
 				paper = rdbuf[5] & 0xf;
-			}
-
-			if (ribbon != 0xff && paper != 0xff) {
 				if (paper == 0xf) {
 					ERROR("No paper tray loaded, aborting!\n");
 					return CUPS_BACKEND_STOP;
-				} else if (paper != job->paper_code) {
-					ERROR("Incorrect paper loaded (%02x vs %02x), aborting job!\n", paper, job->paper_code);
-					return CUPS_BACKEND_HOLD;
 				}
 				if (ribbon == 0xf) {
 					ERROR("No ribbon loaded, aborting!\n");
 					return CUPS_BACKEND_STOP;
-				} else if (ribbon != job->paper_code) {
-					ERROR("Incorrect ribbon loaded (%02x vs %02x), aborting job!\n", ribbon, job->paper_code);
+				}
+				if (paper != job_paper) {
+					ERROR("Incorrect paper loaded (%02x vs %02x), aborting job!\n", paper, job_paper);
 					return CUPS_BACKEND_HOLD;
 				}
-			} else { /* Everything else */
+				if (ribbon != job_ribbon) {
+					ERROR("Incorrect ribbon loaded (%02x vs %02x), aborting job!\n", ribbon, job_ribbon);
+					return CUPS_BACKEND_HOLD;
+				}
+				break;
+			default:
 				if (ctx->printer->paper_code_offset != -1 &&
 				    rdbuf[ctx->printer->paper_code_offset] != job->paper_code) {
 					ERROR("Incorrect media/ribbon loaded (%02x vs %02x), aborting job!\n",
@@ -915,6 +933,7 @@ top:
 					      rdbuf[ctx->printer->paper_code_offset]);
 					return CUPS_BACKEND_HOLD;  /* Hold this job, don't stop queue */
 				}
+				break;
 			}
 		}
 
@@ -1098,7 +1117,7 @@ static const char *canonselphy_prefixes[] = {
 
 const struct dyesub_backend canonselphy_backend = {
 	.name = "Canon SELPHY CP/ES (legacy)",
-	.version = "0.112",
+	.version = "0.113",
 	.uri_prefixes = canonselphy_prefixes,
 	.cmdline_usage = canonselphy_cmdline,
 	.cmdline_arg = canonselphy_cmdline_arg,
@@ -1316,7 +1335,6 @@ const struct dyesub_backend canonselphy_backend = {
       'P' paper 0x11
       'L' paper 0x22
       'C' paper 0x33
-      'W' paper 0x44
 
  ***************************************************************************
  Selphy CP790:
