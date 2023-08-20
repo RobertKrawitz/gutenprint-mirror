@@ -960,7 +960,7 @@ stp_find_params(const char *name, const char *family)
 static int
 compare_names(const void *n1, const void *n2)
 {
-  return strcmp((const char *) n2, (const char *) n2);
+  return strcmp((const char *) n1, (const char *) n2);
 }
 
 void

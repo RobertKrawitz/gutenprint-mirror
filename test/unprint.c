@@ -1712,7 +1712,7 @@ main(int argc,char *argv[])
 	{
 	  if (fp_r)
 	    {
-	      if (!(fp_w = fopen(argv[arg],"w")))
+	      if (!(fp_w = fopen(argv[arg],"wb")))
 		{
 		  perror("Error opening output file");
 		  exit(-1);
@@ -1720,7 +1720,7 @@ main(int argc,char *argv[])
 	    }
 	  else
 	    {
-	      if (!(fp_r = fopen(argv[arg],"r")))
+	      if (!(fp_r = fopen(argv[arg],"rb")))
 		{
 		  perror("Error opening input file");
 		  exit(-1);
