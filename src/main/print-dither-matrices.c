@@ -625,26 +625,21 @@ stpi_dither_array_create_from_file(const char* file, int x, int y)
   stp_mxml_node_t *doc;
   stp_array_t *ret = NULL;
 
-  FILE *fp = fopen(file, "r");
-  if (!fp)
-    {
-      stp_erprintf("stp_curve_create_from_file: unable to open %s: %s\n",
-		   file, strerror(errno));
-      return NULL;
-    }
-
   stp_xml_init();
 
   stp_deprintf(STP_DBG_XML,
 	       "stpi_dither_array_create_from_file: reading `%s'...\n", file);
 
-  doc = stp_mxmlLoadFile(NULL, fp, STP_MXML_NO_CALLBACK);
-  (void) fclose(fp);
+  doc = stp_mxmlLoadFromFile(NULL, file, STP_MXML_NO_CALLBACK);
 
   if (doc)
     {
       ret = xml_doc_get_dither_array(doc, x, y);
       stp_mxmlDelete(doc);
+    }
+  else
+    {
+      stp_erprintf("stp_curve_create_from_file: unable to read from %s\n", file);
     }
 
   stp_xml_exit();
