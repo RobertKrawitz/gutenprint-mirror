@@ -2754,7 +2754,7 @@ pcl_do_print(stp_vars_t *v, stp_image_t *image)
 		errval,		/* Current error value */
 		errline,	/* Current raster line */
 		errlast;	/* Last raster line loaded */
-  unsigned	zero_mask;
+  unsigned	zero_mask = 0;
   int           image_height;
   int           image_width;
   const pcl_cap_t *caps;		/* Printer capabilities */

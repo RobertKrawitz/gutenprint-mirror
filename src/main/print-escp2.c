@@ -4390,7 +4390,7 @@ escp2_print_data(stp_vars_t *v, stp_image_t *image)
   for (y = 0; y < pd->image_printed_height; y ++)
     {
       int duplicate_line = 1;
-      unsigned zero_mask;
+      unsigned zero_mask = 0;
 
       if (errline != errlast)
 	{

@@ -1621,7 +1621,7 @@ lexmark_do_print(stp_vars_t *v, stp_image_t *image)
     errval,		/* Current error value */
     errline,	/* Current raster line */
     errlast;	/* Last raster line loaded */
-  unsigned      zero_mask;
+  unsigned      zero_mask = 0;
   int           image_height;
   int           use_dmt = 0;
   int pass_length=0;              /* count of inkjets for one pass */
