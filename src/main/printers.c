@@ -863,38 +863,40 @@ stp_verify_printer_params(stp_vars_t *v)
 	      stp_get_left(v), stp_get_top(v),
 	      stp_get_width(v), stp_get_height(v));
 
-  if (stp_get_top(v) < top)
+  stp_dimension_t epsilon = 1e-6;
+
+  if (stp_get_top(v) + epsilon < top)
     {
       answer = 0;
       stp_eprintf(v, _("Top margin must not be less than %f\n"), top);
     }
 
-  if (stp_get_left(v) < left)
+  if (stp_get_left(v) + epsilon < left)
     {
       answer = 0;
       stp_eprintf(v, _("Left margin must not be less than %f\n"), left);
     }
 
-  if (stp_get_height(v) <= 0)
+  if (stp_get_height(v) <= -epsilon)
     {
       answer = 0;
       stp_eprintf(v, _("Height must be greater than zero\n"));
     }
 
-  if (stp_get_width(v) <= 0)
+  if (stp_get_width(v) <= -epsilon)
     {
       answer = 0;
       stp_eprintf(v, _("Width must be greater than zero\n"));
     }
 
-  if (stp_get_left(v) + stp_get_width(v) > right)
+  if (stp_get_left(v) + stp_get_width(v) > right + epsilon)
     {
       answer = 0;
       stp_eprintf(v, _("Image is too wide for the page: left margin is %f, width %f, right edge is %f\n"),
 		  stp_get_left(v), stp_get_width(v), right);
     }
 
-  if (stp_get_top(v) + stp_get_height(v) > bottom)
+  if (stp_get_top(v) + stp_get_height(v) > bottom + epsilon)
     {
       answer = 0;
       stp_eprintf(v, _("Image is too long for the page: top margin is %f, height %f, bottom edge is %f\n"),
