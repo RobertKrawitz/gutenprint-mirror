@@ -36,7 +36,9 @@
  */
 
 #include <gutenprint/mxml.h>
+#ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
 #define MXML_BUFSIZE (64)
 #define ENTITY_BUFSIZE (64)
 
