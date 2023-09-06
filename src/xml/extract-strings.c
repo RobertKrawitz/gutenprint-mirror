@@ -24,7 +24,9 @@
 #include <stdio.h>
 #include <gutenprint/gutenprint.h>
 #include <gutenprint/mxml.h>
+#ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
 
 int
 main(int argc, char **argv)
