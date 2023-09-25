@@ -7417,7 +7417,7 @@ static void fuji_ask2000_printer_end(stp_vars_t *v)
 {
   stp_zfwrite("\x1b\x23\x00\x00\x00\x04\x00\xff\xff\xff\xff", 1, 11, v);
   stp_zfwrite("\x1b\x0a\x00\x00\x00\x00\x00", 1, 7, v);
-  stp_zfwrite("\x1b\x23\x00\x00\x00\x04\x00\xff\xff\xff\xff", 1, 11, v);
+//  stp_zfwrite("\x1b\x23\x00\x00\x00\x04\x00\xff\xff\xff\xff", 1, 11, v);
 }
 
 /* Fujifilm ASK-4000 */
@@ -11729,7 +11729,7 @@ static const dyesub_cap_t dyesub_model_capabilities[] =
     &fuji_ask2000_page_list,
     &fuji_ask2000_printsize_list,
     SHRT_MAX,
-    DYESUB_FEATURE_FULL_WIDTH | DYESUB_FEATURE_FULL_HEIGHT | DYESUB_FEATURE_NATIVECOPIES | DYESUB_FEATURE_HASBACKEND | DYESUB_FEATURE_PLANE_INTERLACE,
+    DYESUB_FEATURE_FULL_WIDTH | DYESUB_FEATURE_FULL_HEIGHT | DYESUB_FEATURE_NATIVECOPIES | DYESUB_FEATURE_HASBACKEND | DYESUB_FEATURE_PLANE_INTERLACE | DYESUB_FEATURE_HASBACKEND,
     &fuji_ask2000_printer_init, &fuji_ask2000_printer_end,
     NULL, NULL,
     NULL, NULL, /* No block funcs */
@@ -11744,7 +11744,7 @@ static const dyesub_cap_t dyesub_model_capabilities[] =
     &fuji_ask4000_page_list,
     &fuji_ask4000_printsize_list,
     SHRT_MAX,
-    DYESUB_FEATURE_FULL_WIDTH | DYESUB_FEATURE_FULL_HEIGHT | DYESUB_FEATURE_NATIVECOPIES | DYESUB_FEATURE_HASBACKEND | DYESUB_FEATURE_PLANE_INTERLACE,
+    DYESUB_FEATURE_FULL_WIDTH | DYESUB_FEATURE_FULL_HEIGHT | DYESUB_FEATURE_NATIVECOPIES | DYESUB_FEATURE_HASBACKEND | DYESUB_FEATURE_PLANE_INTERLACE | DYESUB_FEATURE_HASBACKEND,
     &fuji_ask4000_printer_init, &fuji_ask4000_printer_end,
     NULL, NULL,
     NULL, NULL, /* No block funcs */

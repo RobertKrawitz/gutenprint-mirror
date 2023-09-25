@@ -1,7 +1,7 @@
 /*
  *   Sony UP-D series Photo Printer CUPS backend -- libusb-1.0 version
  *
- *   (c) 2013-2021 Solomon Peachy <pizza@shaftnet.org>
+ *   (c) 2013-2023 Solomon Peachy <pizza@shaftnet.org>
  *
  *   The latest version of this program can be found at:
  *
@@ -74,6 +74,7 @@ struct sony_prints {
 
 #define UPD_RIBBON_R206    0x04
 #define UPD_RIBBON_C48     0x04
+#define NDC_RIBBON_D2T     0x02
 
 /* Private data structures */
 struct upd_printjob {
@@ -109,6 +110,10 @@ static const char *upd_ribbons(int type, uint8_t code)
 		/* DR200/DR150 */
 		if (code == UPD_RIBBON_R206)
 			return "R206 (8x6)";
+	} else if (type == P_NDC) {
+		if (code == NDC_RIBBON_D2T) {
+			return "RK-D2T (4x6)";
+		}
 	}
 
 	return "Unknown";
@@ -127,7 +132,12 @@ static int sonyupd_media_maxes(uint8_t type, uint8_t media)
 		if (media == UPD_RIBBON_C48)
 			return 150;
 		return 200; // XXX guess until we have more codes.
+	} else if (type == P_NDC) {
+		if (media == NDC_RIBBON_D2T) {
+			return 600;
+		}
 	}
+
 	return CUPS_MARKER_UNAVAILABLE;
 }
 
@@ -195,7 +205,8 @@ static int sony_get_status(struct upd_ctx *ctx, struct sony_updsts *buf)
 	int ret, num = 0;
 	uint8_t query[7] = { 0x1b, 0xe0, 0, 0, 0, 0x0f, 0 };
 
-	if (ctx->conn->type == P_SONY_UPD895)
+	if (ctx->conn->type == P_SONY_UPD895 ||
+	    ctx->conn->type == P_NDC)
 		query[5] = 0x0e;
 
 	if ((ret = send_data(ctx->conn,
@@ -306,43 +317,121 @@ static void upd_cleanup_job(const void *vjob)
 	free((void*)job);
 }
 
-#define MAX_PRINTJOB_LEN (2048*2764*3 + 2048)
+//#define MAX_PRINTJOB_LEN (2048*2764*3 + 2048)  /* Sony */
+#define MAX_PRINTJOB_LEN (2444*3644*3 + 2048)    /* DPB and ASK series */
 
-static int upd_read_parse(void *vctx, const void **vjob, int data_fd, int copies) {
-	struct upd_ctx *ctx = vctx;
+static int ndc_read_parse(struct upd_ctx *ctx, struct upd_printjob *job, int data_fd, uint32_t *copies_offset)
+{
+	int run = 1;
+	uint32_t param_offset = 0;
+	(void)ctx;
+
+	while(run) {
+		int i;
+		int remain = 0;
+		uint16_t len;
+
+		/* Read the ESC and command */
+		i = read(data_fd, job->databuf + job->datalen, 2);
+		if (i < 0) {
+			return CUPS_BACKEND_CANCEL;
+		}
+		if (i == 0)
+			break;
+
+		if (job->databuf[job->datalen] != 0x1b) {
+			ERROR("Unexpected data in stream! (%02x)\n", job->databuf[job->datalen]);
+			return CUPS_BACKEND_CANCEL;
+		}
+
+		/* Read the rest of the command */
+		switch (job->databuf[job->datalen + 1]) {
+		case 0xea:  // Data transfer
+			remain = 11 - 2;
+			break;
+		default:    // everything else
+			remain = 7 - 2;
+			break;
+		}
+
+		/* Some special casing */
+		if (job->databuf[job->datalen + 1] == 0x0a)
+			run = 0;
+		else if (job->databuf[job->datalen + 1] == 0x0a)
+			*copies_offset = job->datalen + 7;
+		else if (job->databuf[job->datalen + 1] == 0xe1)
+			param_offset = job->datalen + 14;
+
+		i = read(data_fd, job->databuf + job->datalen + 2, remain);
+		if (i != remain) {
+			ERROR("Unexpected read length! (%d)\n", i);
+			return CUPS_BACKEND_CANCEL;
+		}
+
+		switch (job->databuf[job->datalen + 1]) {
+		case 0xea: { // Data transfer
+			uint32_t len;
+			memcpy(&len, job->databuf + job->datalen + 6, sizeof(len));
+			len = be32_to_cpu(len);
+			remain = len;
+			job->datalen += 11;
+			job->imglen = len;
+			break;
+		}
+		default: {    // everything else
+			memcpy(&len, job->databuf + job->datalen + 4, sizeof(len));
+			len = be16_to_cpu(len);
+			job->datalen += 7;
+			remain = len;
+			break;
+		}
+		}
+
+		if(dyesub_debug)
+			DEBUG("Data block (len %d)\n", remain);
+
+		/* Make sure we're not too large */
+		if (job->datalen + remain > MAX_PRINTJOB_LEN) {
+			ERROR("Buffer overflow when parsing printjob! (%d+%d)\n",
+			      job->datalen, remain);
+			return CUPS_BACKEND_CANCEL;
+		}
+
+		/* Read in the data chunk */
+		while (remain > 0) {
+			i = read(data_fd, job->databuf + job->datalen, remain);
+			if (i < 0) {
+				return CUPS_BACKEND_CANCEL;
+			}
+			if (i == 0)
+				break;
+			remain -= i;
+			job->datalen += i;
+		}
+	}
+
+	/* Parse some other stuff */
+	if (param_offset) {
+		memcpy(&job->cols, job->databuf + param_offset, sizeof(uint16_t));
+		memcpy(&job->rows, job->databuf + param_offset + 2, sizeof(uint16_t));
+		job->cols = be16_to_cpu(job->cols);
+		job->rows = be16_to_cpu(job->rows);
+	}
+
+	return CUPS_BACKEND_OK;
+}
+
+static int sony_read_parse(struct upd_ctx *ctx, struct upd_printjob *job, int data_fd, uint32_t *copies_offset) {
+
 	int len, run = 1;
-	uint32_t copies_offset = 0;
 	uint32_t param_offset = 0;
 	uint32_t data_offset = 0;
-
-	struct upd_printjob *job = NULL;
-
-	if (!ctx)
-		return CUPS_BACKEND_FAILED;
-
-	job = malloc(sizeof(*job));
-	if (!job) {
-		ERROR("Memory allocation failure!\n");
-		return CUPS_BACKEND_RETRY_CURRENT;
-	}
-	memset(job, 0, sizeof(*job));
-	job->common.jobsize = sizeof(*job);
-	job->common.copies = copies;
-
-	job->datalen = 0;
-	job->databuf = malloc(MAX_PRINTJOB_LEN);
-	if (!job->databuf) {
-		ERROR("Memory allocation failure!\n");
-		upd_cleanup_job(job);
-		return CUPS_BACKEND_RETRY_CURRENT;
-	}
 
 	while(run) {
 		int i;
 		int keep = 0;
 		i = read(data_fd, job->databuf + job->datalen, 4);
 		if (i < 0) {
-			upd_cleanup_job(job);
 			return CUPS_BACKEND_CANCEL;
 		}
 		if (i == 0)
@@ -424,7 +513,6 @@ static int upd_read_parse(void *vctx, const void **vjob, int data_fd, int copies
 		if (job->datalen + len > MAX_PRINTJOB_LEN) {
 			ERROR("Buffer overflow when parsing printjob! (%d+%d)\n",
 			      job->datalen, len);
-			upd_cleanup_job(job);
 			return CUPS_BACKEND_CANCEL;
 		}
 
@@ -432,7 +520,6 @@ static int upd_read_parse(void *vctx, const void **vjob, int data_fd, int copies
 		while(len > 0) {
 			i = read(data_fd, job->databuf + job->datalen, len);
 			if (i < 0) {
-				upd_cleanup_job(job);
 				return CUPS_BACKEND_CANCEL;
 			}
 			if (i == 0)
@@ -451,7 +538,7 @@ static int upd_read_parse(void *vctx, const void **vjob, int data_fd, int copies
 				// XXX case 0xc0:
 				// for param 03, take the value at offset 4 -- for (eg) 4x6 on 8x6 media, needs to be set to 0x02
 				case 0xee:
-					copies_offset = job->datalen + 7 + offset;
+					*copies_offset = job->datalen + 7 + offset;
 					break;
 				case 0xe1: /* Image dimensions */
 					param_offset = job->datalen + 14 + offset;
@@ -470,20 +557,7 @@ static int upd_read_parse(void *vctx, const void **vjob, int data_fd, int copies
 		}
 	}
 	if (!job->datalen) {
-		upd_cleanup_job(job);
 		return CUPS_BACKEND_CANCEL;
-	}
-
-	/* Some models specify copies in the print job */
-	if (copies_offset) {
-		uint16_t tmp;
-		memcpy(&tmp, job->databuf + copies_offset, sizeof(tmp));
-		tmp = be16_to_cpu(tmp);
-		if (tmp < copies) {  /* Use whichever one is larger */
-			tmp = cpu_to_be16(copies);
-			memcpy(job->databuf + copies_offset, &tmp, sizeof(tmp));
-		}
-		job->common.copies = 1;
 	}
 
 	/* Parse some other stuff */
@@ -498,18 +572,75 @@ static int upd_read_parse(void *vctx, const void **vjob, int data_fd, int copies
 		job->imglen = be32_to_cpu(job->imglen);
 	}
 
+	return CUPS_BACKEND_OK;
+}
+
+static int upd_read_parse(void *vctx, const void **vjob, int data_fd, int copies) {
+	struct upd_ctx *ctx = vctx;
+	struct upd_printjob *job = NULL;
+	uint32_t copies_offset = 0;
+	int rval = CUPS_BACKEND_OK;
+
+	if (!ctx)
+		return CUPS_BACKEND_FAILED;
+
+	job = malloc(sizeof(*job));
+	if (!job) {
+		ERROR("Memory allocation failure!\n");
+		return CUPS_BACKEND_RETRY_CURRENT;
+	}
+	memset(job, 0, sizeof(*job));
+	job->common.jobsize = sizeof(*job);
+	job->common.copies = copies;
+
+	job->datalen = 0;
+	job->databuf = malloc(MAX_PRINTJOB_LEN);
+	if (!job->databuf) {
+		ERROR("Memory allocation failure!\n");
+		rval = CUPS_BACKEND_RETRY_CURRENT;
+		goto done;
+	}
+
+	if (ctx->conn->type == P_NDC) {
+		rval = ndc_read_parse(ctx, job, data_fd, &copies_offset);
+	} else {
+		rval = sony_read_parse(ctx, job, data_fd, &copies_offset);
+	}
+
+	/* Some models specify copies in the print job */
+	if (copies_offset) {
+		uint16_t tmp;
+		memcpy(&tmp, job->databuf + copies_offset, sizeof(tmp));
+		tmp = be16_to_cpu(tmp);
+		if (tmp < copies) {  /* Use whichever one is larger */
+			tmp = cpu_to_be16(copies);
+			memcpy(job->databuf + copies_offset, &tmp, sizeof(tmp));
+		}
+		job->common.copies = 1;
+	}
+
+	if (!job->datalen) {
+		rval = CUPS_BACKEND_CANCEL;
+		goto done;
+	}
+
 	/* Sanity check job parameters */
 	if (job->imglen != (uint32_t)(job->rows * job->cols * ctx->native_bpp))
 	{
 		ERROR("Job data length mismatch (%u vs %d)!\n",
 		      job->imglen, job->rows * job->cols * ctx->native_bpp);
-		upd_cleanup_job(job);
-		return CUPS_BACKEND_CANCEL;
+		rval = CUPS_BACKEND_CANCEL;
+		goto done;
 	}
 
-	*vjob = job;
+done:
+	if (rval) {
+		upd_cleanup_job(job);
+	} else {
+		*vjob = job;
+	}
 
-	return CUPS_BACKEND_OK;
+	return rval;
 }
 
 static int upd_main_loop(void *vctx, const void *vjob, int wait_for_return) {
@@ -741,7 +872,7 @@ static const char *sonyupd_prefixes[] = {
 
 const struct dyesub_backend sonyupd_backend = {
 	.name = "Sony UP-D",
-	.version = "0.46",
+	.version = "0.49",
 	.uri_prefixes = sonyupd_prefixes,
 	.cmdline_arg = upd_cmdline_arg,
 	.cmdline_usage = upd_cmdline,
@@ -758,6 +889,10 @@ const struct dyesub_backend sonyupd_backend = {
 		{ 0x054c, 0x02d4, P_SONY_UPCR10, NULL, "sony-upcx1"},
 		{ 0x054c, 0x0049, P_SONY_UPD895, NULL, "sony-upd895"},
 		{ 0x054c, 0x01e7, P_SONY_UPD897, NULL, "sony-upd897"},
+		{ 0x07ce, 0xc011, P_NDC, NULL, "ndc-dpb-7000"},
+		{ 0x07ce, 0xc011, P_NDC, NULL, "fujifilm-ask-2500"}, // duplicate, has different IEEE1284
+		// DPB-6000/ASK-2000
+		// DPB-4000/ASK-4000/DNP Q8
 		{ 0, 0, 0, NULL, NULL}
 	}
 };
@@ -791,46 +926,48 @@ const struct dyesub_backend sonyupd_backend = {
    All printer commands start with 0x1b, and are at least 7 bytes long.
    General Command format:
 
-    1b XX ?? ?? ?? LL 00       # XX is cmd, LL is data or response length.
+    1b XX ?? ?? LL LL 00       # XX is cmd, LL is data/response length, BE.
+
+   If least significant bit of XX is 1, it is a WRITE, and LL is number of bytes of the payload.  If LSB is 0, it is a READ, and printer will return LL bytes.
 
    UNKNOWN QUERY  [possibly media?]
 
- <- 1b 03 00 00 00  13 00
+ <- 1b 03 00 00  00 13  00
  -> 70 00 00 00 00 00 00 0b  00 00 00 00 00 00 00 00
     00 00 00
 
-   UNKNOWN CMD (UP-DR & SL10 & UP-D895 & UP-DP10)  [ possibly START ]
+   UNKNOWN CMD (UP-DR & SL10 & UP-D895 & UP-DP10 & DPB/ASK)  [ possibly START? ]
 
- <- 1b 0a 00 00 00 00 00
+ <- 1b 0a 00 00  00 00  00
 
    PRINT DIMENSIONS
 
- <- 1b 15 00 00 00  0d 00
+ <- 1b 15 00 00  00 0d  00
  <- 00 00 00 00 ZZ QQ QQ WW  WW YY YY XX XX
 
     QQ/WW/YY/XX are (origin_cols/origin_rows/cols/rows) in BE.
-    ZZ is 0x07 on UP-DR series, 0x01 on UP-D89x series. plane mask maybe?
+    ZZ is 0x07 on UP-DR series, 0x01 on UP-D89x series, 0x60 on Fujifilms
 
    RESET
 
- <- 1b 16 00 00 00 00 00
+ <- 1b 16 00 00  00 00  00
 
    UNKNOWN CMD (UP-DR & SL & UP-D897, may be PRINT START?)
 
- <- 1b 17 00 00 00 00 00
+ <- 1b 17 00 00  00 00  00
 
    UNKNOWN CMD
 
- <- 1b 1f 00 00 00 00 00
+ <- 1b 1f 00 00  00 00  00
 
    SET PARAM
 
- <- 1b c0 00 NN 00 LL 00    # LL is response length, NN is number.
+ <- 1b c0 00 NN  LL LL  00    # LL is response length, NN is number.
  <- [ LL bytes]
 
    QUERY PARAM
 
- <- 1b c1 00 NN 00 LL 00    # LL is response length, NN is number.
+ <- 1b c1 00 NN  LL LL  00    # LL is response length, NN is number.
  -> [ LL bytes ]
 
       PARAMS SEEN:
@@ -841,47 +978,57 @@ const struct dyesub_backend sonyupd_backend = {
 
    STATUS QUERY
 
- <- 1b e0 00 00 00  XX 00       # XX = 0xe (UP-D895), 0xf (All others)
+ <- 1b e0 00 00  XX XX  00       # XX = 0x000e (UP-D895 or NDC), 0x000f (All others)
  -> [14 or 15 bytes, see 'struct sony_updsts' ]
 
    IMAGE DIMENSIONS & OVERCOAT
 
- <- 1b e1 00 00 00  0b 00
- <- 00 ZZ QQ 00 00 00 00 XX XX YY YY  # XX = cols, YY == rows, ZZ == 0x04 on UP-DP10, otherwise 0x80. QQ == 00 glossy, 08 texture (UP-DP10 + UP-DR150), 0c matte, +0x10 for "nocorrection" on UP-DR200..
+ <- 1b e1 00 00  00 0b  00
+ <- 00 ZZ QQ 00 00 00 00 XX XX YY YY  # XX = cols, YY == rows, ZZ == 0x04 on UP-DP10/DPB-xxxx/ASK-xxxx, otherwise 0x80. QQ == 00 glossy, 08 texture (UP-DP10 + UP-DR150), 0c matte, +0x10 for "nocorrection" on UP-DR200..
 
    UNKNOWN
 
- <- 1b e5 00 00 00  08 00
+ <- 1b e5 00 00  00 08  00
  <- 00 00 00 00 00 00 00 XX  00  # Seen 01, 12, 0d, etc.
 
    UNKNOWN  (UP-D897)
 
- <- 1b e6 00 00 00  08 00
- <- 07 00 00 00 00 00 00 00
+ <- 1b e6 00 00  00 08  00
+ -> 07 00 00 00 00 00 00 00
 
    DATA TRANSFER
 
- <- 1b ea 00 00 00 00 ZZ ZZ ZZ ZZ 00  # ZZ is BIG ENDIAN
+ <- 1b ea 00 00 00 00  ZZ ZZ ZZ ZZ  00  # ZZ is BIG ENDIAN
  <- [ ZZ ZZ ZZ ZZ bytes of data ]
 
    UNKNOWN CMD (UP-DR and UP-D)
 
- <- 1b ed 00 00 00  00 00
+ <- 1b ed 00 00  00 00  00
 
    QUERY REMAINING PRINTS (UPDR series)
 
- <- 1b ef 00 00 00  06 00
+ <- 1b ef 00 00  00 06  00
  -> 05 00 00 00 NN NN      # NN NN  print count on media remaining
 
    COPIES
 
- <- 1b ee 00 00 00  02 00
+ <- 1b ee 00 00  00 02  00
  <- NN NN                        # Number of copies (BE, 1-???)
 
    UNKNOWN (UPDR series)
 
- <- 1b f5 00 00 00  02 00
+ <- 1b f5 00 00  00 02  00
  <- ?? ??
+
+   UNKNOWN (Fujifilm ASK2000 series)
+
+ <- 1b 23 00 00  00 04  00
+ <- ff ff ff ff
+
+   UNKNOWN (Fujifilm ASK2000/4000 series)
+
+ <- 1b 1e 00 00  00 0c  00
+    00 00 00 00 00 00 00 00 00 00 00 00
 
   ************************************************************************
 
@@ -933,7 +1080,7 @@ const struct dyesub_backend sonyupd_backend = {
 <- 1b e0 00 00 00 0f 00
 -> 0e 00 00 00 00 00 00 00  04 a8 08 00 0a a4 00
 
-<- 1b 0a 00 00 00 00 00   ** In spool file
+<- 1b 0a 00 00 00 00 00   ** In spool file, marks end of file?
 <- 1b 17 00 00 00 00 00   ** In spool file
 
 [[fin]]

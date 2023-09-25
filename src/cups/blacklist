@@ -362,3 +362,7 @@
 
 # Magicard Enduro+
 0x0c1f 0x880a blacklist
+
+# Nidec Copal DPB-7000
+# Fujifilm ASK-2500
+0x07ce 0xc011 blacklist
