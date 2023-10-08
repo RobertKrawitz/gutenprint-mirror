@@ -96,7 +96,7 @@ typedef int (*CPD30_DoConvertFN)(const struct mitsu_cpd30_data *table,
 
 #define REQUIRED_LIB_APIVERSION 8
 
-#define LIBMITSU_VER "0.09-dnp1"
+#define LIBMITSU_VER "0.10"
 
 /* Image processing library function prototypes */
 #define LIB_NAME_RE "libMitsuD70ImageReProcess" DLL_SUFFIX

@@ -9,7 +9,7 @@
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the Free
- *   Software Foundation; either version 3 of the License, or (at your option)
+ *   Software Foundation; either version 2 of the License, or (at your option)
  *   any later version.
  *
  *   This program is distributed in the hope that it will be useful, but
@@ -20,7 +20,7 @@
  *   You should have received a copy of the GNU General Public License
  *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  *
- *   SPDX-License-Identifier: GPL-3.0+
+ *   SPDX-License-Identifier: GPL-2.0+
  *
  */
 
@@ -2613,14 +2613,13 @@ static const char *mitsu70x_prefixes[] = {
 	"mitsu70x", // Family entry, do not nuke.
 	// backwards compatibility
 	"mitsud80", "mitsuk60", "kodak305", "fujiask300",
-	"dnpds480", "dnpds680",
 	NULL,
 };
 
 /* Exported */
 const struct dyesub_backend mitsu70x_backend = {
 	.name = "Mitsubishi CP-D70 family",
-	.version = "0.106-dnp3" " (lib " LIBMITSU_VER ")",
+	.version = "0.108" " (lib " LIBMITSU_VER ")",
 	.flags = BACKEND_FLAG_DUMMYPRINT,
 	.uri_prefixes = mitsu70x_prefixes,
 	.cmdline_usage = mitsu70x_cmdline,
