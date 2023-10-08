@@ -1,7 +1,7 @@
 /*
  *   Magicard card printer family CUPS backend -- libusb-1.0 version
  *
- *   (c) 2017-2021 Solomon Peachy <pizza@shaftnet.org>
+ *   (c) 2017-2023 Solomon Peachy <pizza@shaftnet.org>
  *
  *   The latest version of this program can be found at:
  *
@@ -720,6 +720,12 @@ static int magicard_read_parse(void *vctx, const void **vjob, int data_fd, int c
 	/* This is how much of the initial buffer is the header length. */
 	job->hdr_len = job->datalen;
 
+	if (job->datalen + remain > MAX_PRINTJOB_LEN) {
+		ERROR("Buffer overflow when parsing printjob! (%d+%d)\n",
+		      job->datalen, remain);
+		return CUPS_BACKEND_CANCEL;
+	}
+
 	if (x_gp_8bpp) {
 		uint32_t srcbuf_offset = INITIAL_BUF_LEN - buf_offset;
 		uint8_t *srcbuf = malloc(MAX_PRINTJOB_LEN);
@@ -923,7 +929,7 @@ static const char *magicard_prefixes[] = {
 
 const struct dyesub_backend magicard_backend = {
 	.name = "Magicard family",
-	.version = "0.18",
+	.version = "0.19",
 	.uri_prefixes = magicard_prefixes,
 	.cmdline_arg = magicard_cmdline_arg,
 	.cmdline_usage = magicard_cmdline,

@@ -354,6 +354,12 @@ static int ndc_read_parse(struct upd_ctx *ctx, struct upd_printjob *job, int dat
 			break;
 		}
 
+		if (job->datalen + remain > MAX_PRINTJOB_LEN) {
+			ERROR("Buffer overflow when parsing printjob! (%d+%d)\n",
+			      job->datalen, remain);
+			return CUPS_BACKEND_CANCEL;
+		}
+
 		/* Some special casing */
 		if (job->databuf[job->datalen + 1] == 0x0a)
 			run = 0;
@@ -872,7 +878,7 @@ static const char *sonyupd_prefixes[] = {
 
 const struct dyesub_backend sonyupd_backend = {
 	.name = "Sony UP-D",
-	.version = "0.49",
+	.version = "0.50",
 	.uri_prefixes = sonyupd_prefixes,
 	.cmdline_arg = upd_cmdline_arg,
 	.cmdline_usage = upd_cmdline,

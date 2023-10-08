@@ -1494,7 +1494,16 @@ static int dnpds40_read_parse(void *vctx, const void **vjob, int data_fd, int co
 	}
 
 	while (run) {
-		int remain, i, j;
+		int i, j;
+		uint32_t remain;
+
+		/* Make sure we won't overflow... */
+		if (job->datalen + sizeof(struct dnpds40_cmd) > MAX_PRINTJOB_LEN) {
+			ERROR("Buffer overflow when parsing printjob! (%d+%lu)\n",
+			      job->datalen, sizeof(struct dnpds40_cmd));
+			return CUPS_BACKEND_CANCEL;
+		}
+
 		/* Read in command header */
 		i = read(data_fd, job->databuf + job->datalen,
 			 sizeof(struct dnpds40_cmd));
@@ -1559,6 +1568,14 @@ static int dnpds40_read_parse(void *vctx, const void **vjob, int data_fd, int co
 
 		/* Read in data chunk as quickly as possible */
 		remain = j;
+
+		/* Make sure we won't overflow... */
+		if (job->datalen + remain > MAX_PRINTJOB_LEN) {
+			ERROR("Buffer overflow when parsing printjob! (%d+%d)\n",
+			      job->datalen, remain);
+			return CUPS_BACKEND_CANCEL;
+		}
+
 		while (remain > 0) {
 			i = read(data_fd, job->databuf + job->datalen + sizeof(struct dnpds40_cmd),
 				 remain);
@@ -3483,7 +3500,7 @@ static const char *dnpds40_prefixes[] = {
 
 const struct dyesub_backend dnpds40_backend = {
 	.name = "DNP DS-series / Citizen C-series",
-	.version = "0.145.1",
+	.version = "0.145.2",
 	.uri_prefixes = dnpds40_prefixes,
 	.cmdline_usage = dnpds40_cmdline,
 	.cmdline_arg = dnpds40_cmdline_arg,
