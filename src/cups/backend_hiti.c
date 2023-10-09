@@ -2447,7 +2447,7 @@ static int hiti_main_loop(void *vctx, const void *vjob, int wait_for_return)
 	sf.rows = cpu_to_be16(rows);
 	sf.rows_offset = calc_offset(5, ctx->calibration.vert, 8, 4);
 	sf.cols_offset = calc_offset(ctx->calibration.horiz, 6, 11, 4);
-	sf.colorSeq = 0x87 + (job->hdr.overcoat ? 0xc0 : 0);
+	sf.colorSeq = 0x87 | (job->hdr.overcoat ? 0xc0 : 0);
 	sf.copies = job->common.copies;
 	sf.printMode = (ctx->conn->type == P_HITI_461)
 		? 0 : 0x08 + (job->hdr.quality ? 0x02 : 0);
@@ -3187,7 +3187,7 @@ static const char *hiti_prefixes[] = {
 
 const struct dyesub_backend hiti_backend = {
 	.name = "HiTi Photo Printers",
-	.version = "0.54.1",
+	.version = "0.54.2",
 	.uri_prefixes = hiti_prefixes,
 	.cmdline_usage = hiti_cmdline,
 	.cmdline_arg = hiti_cmdline_arg,
