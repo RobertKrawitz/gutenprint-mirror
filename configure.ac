@@ -1202,7 +1202,10 @@ echo "$PACKAGE_BUGREPORT" |tee -a config.summary
 echo |tee -a config.summary
 echo "================================================================" |tee -a config.summary
 echo "  Release: $PACKAGE_STRING generated on $RELEASE_DATE" |tee -a config.summary
-echo "  Generated at `date` by $LOGNAME" |tee -a config.summary
+DATE_FMT="+%Y-%m-%dT%H:%M:%S+0000"
+SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(date +%s)}"
+BUILD_DATE=$(date -u -d "@$SOURCE_DATE_EPOCH" "$DATE_FMT" 2>/dev/null || date -u -r "$SOURCE_DATE_EPOCH" "$DATE_FMT" 2>/dev/null || date -u "$DATE_FMT")
+echo "  Generated at $BUILD_DATE by $LOGNAME" |tee -a config.summary
 echo |tee -a config.summary
 echo "  Features:" |tee -a config.summary
 if test "$BUILD_CUPS" != "no" ; then
