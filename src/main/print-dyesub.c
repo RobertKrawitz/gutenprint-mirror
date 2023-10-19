@@ -214,6 +214,9 @@ typedef struct
   int advance;
   int sharp;
   int tone;
+  int printinfo;
+  int longfeed;
+  int papertype;
 } sonymd_privdata_t;
 
 typedef struct
@@ -2328,6 +2331,319 @@ LIST(dyesub_printsize_list_t, sony_up971_printsize_list, dyesub_printsize_t, son
 static void sony_up971_printer_init_func(stp_vars_t *v)
 {
   sony_updneo_mono_init_func(v, 0x0126, 0x07b3);
+}
+
+/* Sony UP-D771MD */
+static const dyesub_pagesize_t sony_d771_page[] =
+{
+  DEFINE_PAPER_SIMPLE( "w215h143", "596x896", PT1(596,300), PT1(896,300), DYESUB_LANDSCAPE),
+  DEFINE_PAPER_SIMPLE( "w215h161", "672x896",  PT1(672,300), PT1(896,300), DYESUB_LANDSCAPE),
+  DEFINE_PAPER_SIMPLE( "w215h215", "896x896", PT1(896,300), PT1(896,300), DYESUB_PORTRAIT),
+  DEFINE_PAPER_SIMPLE( "w215h287", "1196x896", PT1(896,300), PT1(1196,300), DYESUB_PORTRAIT),
+  DEFINE_PAPER_SIMPLE( "w215h645", "2688x896",  PT1(896,300), PT1(2688,300), DYESUB_PORTRAIT),
+  /* A true "custom" size, printer will cut at the image boundary */
+  DEFINE_PAPER_SIMPLE( "Custom", "Custom", PT1(896,300), -1, DYESUB_PORTRAIT),
+};
+
+LIST(dyesub_pagesize_list_t, sony_d771_page_list, dyesub_pagesize_t, sony_d771_page);
+
+static const dyesub_printsize_t sony_d771_printsize[] =
+{
+  { "300x300", "w215h143", 596, 896},
+  { "300x300", "w215h161", 672, 896},
+  { "300x300", "w215h215", 896, 896},
+  { "300x300", "w215h287", 896, 1196},
+  { "300x300", "w215h645", 896, 2688},
+  { "300x300", "Custom", 896, 2688}, /* Maximum */
+};
+
+LIST(dyesub_printsize_list_t, sony_d771_printsize_list, dyesub_printsize_t, sony_d771_printsize);
+
+
+static void sony_upd771_printer_init_func(stp_vars_t *v)
+{
+  dyesub_privdata_t *pd = get_privdata(v);
+
+  stp_zfwrite("\x83\xff\xff\xff\xfc\xff\xff\xff"
+              "\xfb\xff\xff\xff\xf5\xff\xff\xff", 1, 16, v);
+
+  stp_put32_le(20, v);
+  stp_zfwrite("\x1b\x15\x00\x00\x00\x0d\x00"
+              "\x00\x00\x00\x00\x01\x01\x43", 1, 14, v);
+  stp_put16_be(0, v);
+  stp_put16_be(pd->w_size, v);
+  stp_put16_be(pd->h_size, v);
+
+  stp_put32_le(11, v);
+  stp_zfwrite("\x1b\xea\x00\x00\x00\x00", 1, 6, v);
+  stp_put32_be(pd->h_size * pd->w_size, v);
+  stp_putc(0x00, v);
+  stp_put32_le(pd->h_size * pd->w_size, v);
+}
+
+static void sony_upd771_printer_end_func(stp_vars_t *v)
+{
+  dyesub_privdata_t *pd = get_privdata(v);
+
+  stp_put32_be(0xeaffffff, v);
+
+  stp_put32_le(9, v);
+  stp_zfwrite("\x1b\xee\x00\x00\x00\x02\x00", 1, 7, v);
+  stp_put16_be(pd->copies, v);
+
+  stp_put32_be(0xeeffffff, v);
+  stp_put32_be(1, v);
+
+  stp_put32_le(15, v);
+  stp_zfwrite("\x1b\xe5\x00\x00\x00\x08\x00\x00\x00\x00\x00", 1, 11, v);
+  stp_putc(pd->privdata.sonymd.dark, v);
+  stp_putc(pd->privdata.sonymd.light, v);
+  stp_putc(pd->privdata.sonymd.sharp, v);
+  stp_putc(pd->privdata.sonymd.advance, v);
+
+  stp_put32_be(0xecffffff, v);
+  stp_put32_be(0, v);
+
+  stp_put32_le(12, v);
+  stp_zfwrite("\x1b\xc0\x00\x00\x00\x05\x00\x02", 1, 8, v);
+  stp_zfwrite("\x00\x00\x01", 1, 3, v);
+  stp_putc(pd->privdata.sonymd.gamma, v);
+
+  stp_put32_be(0xecffffff, v);
+  stp_put32_be(pd->privdata.sonymd.printinfo, v);
+
+  stp_put32_le(17, v);
+  stp_zfwrite("\x1b\xc0\x00\x01\x00\x0a\x00\x02", 1, 8, v);
+  stp_zfwrite("\x01\x00\x06", 1, 3, v);
+  dyesub_nputc(v, 0x0, 6);
+
+  stp_put32_be(0xedffffff, v);
+  stp_put32_be(0, v);
+
+  stp_put32_le(12, v);
+  stp_zfwrite("\x1b\xc0\x00\x01\x00\x05\x00\x02", 1, 8, v);
+  stp_zfwrite("\x0a\x00\x01", 1, 3, v);
+  stp_putc(pd->privdata.sonymd.papertype, v);
+
+  stp_put32_le(12, v);
+  stp_zfwrite("\x1b\xc0\x00\x01\x00\x05\x00\x02", 1, 8, v);
+  stp_zfwrite("\x0c\x00\x01", 1, 3, v);
+  stp_putc(pd->privdata.sonymd.longfeed, v);
+
+  stp_put32_le(12, v);
+  stp_zfwrite("\x1b\xc0\x00\x01\x00\x05\x00\x02", 1, 8, v);
+  stp_zfwrite("\x0b\x00\x01", 1, 3, v);
+  stp_putc(pd->privdata.sonymd.printinfo, v);
+
+  stp_put32_le(18, v);
+  stp_zfwrite("\x1b\xe1\x00\x00\x00\x0b\x00\x00\x08\00", 1, 10, v);
+  stp_put16_be(0x00, v); // XXX GG GG, based on print size?  Blank lines?
+  dyesub_nputc(v, 0x0, 2);
+  stp_put16_be(pd->w_size, v);
+  stp_put16_be(pd->h_size, v);
+
+  stp_put32_be(0xfaffffff, v);
+
+  stp_put32_le(7, v);
+  stp_zfwrite("\x1b\x0a\x00\x00\x00\x00\x00", 1, 7, v);
+
+  stp_zfwrite("\xfc\xff\xff\xff"
+              "\xfd\xff\xff\xff"
+              "\xff\xff\xff\xff", 1, 12, v);
+  stp_put32_le(7, v);
+  stp_zfwrite("\x1b\x17\x00\x00\x00\x00\x00", 1, 7, v);
+  stp_put32_be(0xf4ffffff, v);
+}
+
+static const dyesub_stringitem_t sony_upd771_medias[] =
+{
+  { "S", N_ ("Standard") },
+  { "HG", N_ ("High Grade") },
+};
+LIST(dyesub_stringlist_t, sony_upd771_media_list, dyesub_stringitem_t, sony_upd771_medias);
+
+static const stp_parameter_t sony_upd771_parameters[] =
+{
+  {
+    "SonyGamma", N_("Printer Gamma Correction"), "Color=No,Category=Advanced Printer Setup",
+    N_("Printer Gamma Correction"),
+    STP_PARAMETER_TYPE_STRING_LIST, STP_PARAMETER_CLASS_FEATURE,
+    STP_PARAMETER_LEVEL_ADVANCED, 1, 1, STP_CHANNEL_NONE, 1, 0
+  },
+  {
+    "Sharpen", N_("Image Sharpening"), "Color=No,Category=Advanced Printer Setup",
+    N_("Sharpening to apply to image (0 is off, 14 is max"),
+    STP_PARAMETER_TYPE_INT, STP_PARAMETER_CLASS_FEATURE,
+    STP_PARAMETER_LEVEL_BASIC, 1, 1, STP_CHANNEL_NONE, 1, 0
+  },
+  {
+    "Darkness", N_("Darkness"), "Color=No,Category=Advanced Printer Setup",
+    N_("Printer Image Darkness Adjustment"),
+    STP_PARAMETER_TYPE_INT, STP_PARAMETER_CLASS_FEATURE,
+    STP_PARAMETER_LEVEL_ADVANCED, 1, 1, STP_CHANNEL_NONE, 1, 0
+  },
+  {
+    "Lightness", N_("Lightness"), "Color=No,Category=Advanced Printer Setup",
+    N_("Printer Image Lightness Adjustment"),
+    STP_PARAMETER_TYPE_INT, STP_PARAMETER_CLASS_FEATURE,
+    STP_PARAMETER_LEVEL_ADVANCED, 1, 1, STP_CHANNEL_NONE, 1, 0
+  },
+  {
+    "Advance", N_("Advance"), "Color=No,Category=Advanced Printer Setup",
+    N_("Printer Image Advance Adjustment"),
+    STP_PARAMETER_TYPE_INT, STP_PARAMETER_CLASS_FEATURE,
+    STP_PARAMETER_LEVEL_ADVANCED, 1, 1, STP_CHANNEL_NONE, 1, 0
+  },
+  {
+    "LongFeedAfter", N_("LongFeedAfter"), "Color=No,Category=Advanced Printer Setup",
+    N_("Long Feed After N Pages"),
+    STP_PARAMETER_TYPE_INT, STP_PARAMETER_CLASS_FEATURE,
+    STP_PARAMETER_LEVEL_ADVANCED, 1, 1, STP_CHANNEL_NONE, 1, 0
+  },
+  {
+    "PrintInfo", N_("Print Info"), "Color=No,Category=Advanced Printer Setup",
+    N_("Print Information"),
+    STP_PARAMETER_TYPE_BOOLEAN, STP_PARAMETER_CLASS_FEATURE,
+    STP_PARAMETER_LEVEL_ADVANCED, 1, 1, STP_CHANNEL_NONE, 1, 0
+  },
+  {
+    "SonyMediaType", N_("Roll Type"), "Color=No,Category=Advanced Printer Setup",
+    N_("Roll Type"),
+    STP_PARAMETER_TYPE_STRING_LIST, STP_PARAMETER_CLASS_FEATURE,
+    STP_PARAMETER_LEVEL_ADVANCED, 1, 1, STP_CHANNEL_NONE, 1, 0
+  },
+};
+#define sony_upd771_parameter_count (sizeof(sony_upd771_parameters) / sizeof(const stp_parameter_t))
+
+static int
+sony_upd771_load_parameters(const stp_vars_t *v, const char *name,
+			    stp_parameter_t *description)
+{
+  int	i;
+  const dyesub_cap_t *caps = dyesub_get_model_capabilities(v,
+                                            stp_get_model_id(v));
+
+  if (caps->parameter_count && caps->parameters)
+    {
+      for (i = 0; i < caps->parameter_count; i++)
+        if (strcmp(name, caps->parameters[i].name) == 0)
+          {
+	    stp_fill_parameter_settings(description, &(caps->parameters[i]));
+	    break;
+          }
+    }
+
+  if (strcmp(name, "SonyGamma") == 0)
+    {
+      description->bounds.str = stp_string_list_create();
+
+      const dyesub_stringlist_t *mlist = &sony_upd897_gamma_list;
+      for (i = 0; i < mlist->n_items; i++)
+        {
+          const dyesub_stringitem_t *m = &(mlist->item[i]);
+          stp_string_list_add_string(description->bounds.str,
+                                     m->name, m->text); /* Do *not* want this translated, otherwise use gettext(m->text) */
+	}
+      description->deflt.str = stp_string_list_param(description->bounds.str, 3)->name;
+      description->is_active = 1;
+    }
+  else if (strcmp(name, "Darkness") == 0)
+    {
+      description->deflt.integer = 0;
+      description->bounds.integer.lower = -64;
+      description->bounds.integer.upper = 64;
+      description->is_active = 1;
+    }
+  else if (strcmp(name, "Lightness") == 0)
+    {
+      description->deflt.integer = 0;
+      description->bounds.integer.lower = -64;
+      description->bounds.integer.upper = 64;
+      description->is_active = 1;
+    }
+  else if (strcmp(name, "Advance") == 0)
+    {
+      description->deflt.integer = 0;
+      description->bounds.integer.lower = -32;
+      description->bounds.integer.upper = 32;
+      description->is_active = 1;
+    }
+  else if (strcmp(name, "Sharpen") == 0)
+    {
+      description->deflt.integer = 2;
+      description->bounds.integer.lower = 0;
+      description->bounds.integer.upper = 14;
+      description->is_active = 1;
+    }
+  else if (strcmp(name, "LongFeedAfter") == 0)
+    {
+      description->deflt.integer = 1;
+      description->bounds.integer.lower = 0;
+      description->bounds.integer.upper = 255;
+      description->is_active = 1;
+    }
+  else if (strcmp(name, "PrintInfo") == 0)
+    {
+      description->is_active = 1;
+      description->deflt.boolean = 0;
+    }
+  else if (strcmp(name, "SonyMediaType") == 0)
+    {
+      description->bounds.str = stp_string_list_create();
+
+      const dyesub_stringlist_t *mlist = &sony_upd771_media_list;
+      for (i = 0; i < mlist->n_items; i++)
+        {
+          const dyesub_stringitem_t *m = &(mlist->item[i]);
+          stp_string_list_add_string(description->bounds.str,
+                                     m->name, m->text); /* Do *not* want this translated, otherwise use gettext(m->text) */
+	}
+      description->deflt.str = stp_string_list_param(description->bounds.str, 0)->name;
+      description->is_active = 1;
+    }
+  else
+   {
+     return 0;
+   }
+  return 1;
+}
+
+static int sony_upd771_parse_parameters(stp_vars_t *v)
+{
+  dyesub_privdata_t *pd = get_privdata(v);
+  const char *gamma = stp_get_string_parameter(v, "SonyGamma");
+  const char *media = stp_get_string_parameter(v, "SonyMediaType");
+
+  /* No need to set global params if there's no privdata yet */
+  if (!pd)
+    return 1;
+
+  pd->privdata.sonymd.dark = stp_get_int_parameter(v, "Darkness");
+  pd->privdata.sonymd.light = stp_get_int_parameter(v, "Lightness");
+  pd->privdata.sonymd.advance = stp_get_int_parameter(v, "Advance");
+  pd->privdata.sonymd.sharp = stp_get_int_parameter(v, "Sharpen");
+  pd->privdata.sonymd.longfeed = stp_get_int_parameter(v, "LongFeedAfter");
+  pd->privdata.sonymd.printinfo = stp_get_boolean_parameter(v, "PrintInfo");
+
+  if (!strcmp(gamma, "Hard")) {
+    pd->privdata.sonymd.gamma = 0x03;
+  } else if (!strcmp(gamma, "Normal")) {
+    pd->privdata.sonymd.gamma = 0x02;
+  } else if (!strcmp(gamma, "Soft")) {
+    pd->privdata.sonymd.gamma = 0x01;
+  } else if (!strcmp(gamma, "Softer")) {
+    pd->privdata.sonymd.gamma = 0x04;
+  } else {
+    pd->privdata.sonymd.gamma = 0x00;
+  }
+
+  if (!strcmp(media, "HG")) {
+    pd->privdata.sonymd.papertype = 1;
+  } else {
+    pd->privdata.sonymd.papertype = 0;
+  }
+
+  return 1;
 }
 
 /* Sony UP-CR20 family */
@@ -11120,6 +11436,25 @@ static const dyesub_cap_t dyesub_model_capabilities[] =
     sony_upd898_parameter_count,
     sony_upd898_load_parameters,
     sony_upd898_parse_parameters,
+  },
+  { /* Sony UP-D711 Family */
+    2013,
+    &w_ink_list,
+    &res_300dpi_list,
+    &sony_d771_page_list,
+    &sony_d771_printsize_list,
+    SHRT_MAX,
+    DYESUB_FEATURE_FULL_WIDTH | DYESUB_FEATURE_FULL_HEIGHT
+      | DYESUB_FEATURE_MONOCHROME | DYESUB_FEATURE_NATIVECOPIES | DYESUB_FEATURE_HASBACKEND,
+    &sony_upd771_printer_init_func, &sony_upd771_printer_end_func,
+    NULL, NULL,
+    NULL, NULL, /* No block funcs */
+    NULL, NULL,
+    NULL, NULL,
+    sony_upd771_parameters,
+    sony_upd771_parameter_count,
+    sony_upd771_load_parameters,
+    sony_upd771_parse_parameters,
   },
   { /* Fujifilm Printpix CX-400  */
     3000,
