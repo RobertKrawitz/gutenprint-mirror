@@ -176,6 +176,7 @@
       <printer translate="name" name="Mitsubishi CP-9800DZ" deviceid="MFG:MITSUBISHI;CMD:MEL;MDL:CP9800DZ;CLS:PRINTER;DES:MITSUBISHI CP9800DZ;" driver="mitsubishi-9800dz" manufacturer="Mitsubishi" model="4113" />
       <printer translate="name" name="Mitsubishi CP-9810D" driver="mitsubishi-9810d" manufacturer="Mitsubishi" model="4104">EXPERIMENTAL</printer>
       <printer translate="name" name="Mitsubishi CP-9810DW" driver="mitsubishi-9810dw" manufacturer="Mitsubishi" model="4104">EXPERIMENTAL</printer>
+      <printer translate="name" name="Mitsubishi CP-9820DW-AG" deviceid="MFG:MITSUBISHI;CMD:MEL;MDL:CP98DZ;CLS:PRINTER;DES:MITSUBISHI CP98DZ;" driver="mitsubishi-9820dw-ag" manufacturer="Mitsubishi" model="4104">EXPERIMENTAL</printer>
       <printer translate="name" name="Mitsubishi CP-D80DW" deviceid="MFG:MITSUBISHI;CMD:MEL;MDL:CPD80D;CLS:PRINTER;DES:MITSUBISHI_CPD80D" driver="mitsubishi-d80dw" manufacturer="Mitsubishi" model="4107" />
       <printer translate="name" name="Mitsubishi CP-D90DW" deviceid="MFG:MITSUBISHI;CMD:MEL;MDL:CPD90D;CLS:PRINTER;DES:MITSUBISHI_CPD90D" driver="mitsubishi-d90dw" manufacturer="Mitsubishi" model="4109" />
       <printer translate="name" name="Mitsubishi CP-D70DW" deviceid="MFG:MITSUBISHI;CMD:MEL;MDL:CP60D70D707D;CLS:PRINTER;DES:MITSUBISHI CP60D70D707D" driver="mitsubishi-d70dw" manufacturer="Mitsubishi" model="4105" />
@@ -208,7 +209,7 @@
       <printer translate="name" name="Sony UP-DR200" driver="sony-updr200" manufacturer="Sony" model="2004" />
       <printer translate="name" name="Sony UP-CR10L" deviceid="MFG:SONY;MDL:UP-CR10L;DES:Sony UP-CR10L;CMD:SONY-Original;CLS:PRINTER" driver="sony-upcr10l" manufacturer="Sony" model="2005"/>
       <printer translate="name" name="Sony UP-CX1" deviceid="MFG:SONY;MDL:UP-CX1;DES:Sony UP-CX1;CMD:SONY-Original;CLS:PRINTER" driver="sony-upcx1" manufacturer="Sony" model="2005"/>
-      <printer translate="name" name="Sony UP-D771MD" deviceid="MFG:Sony;MDL:UP-D711MD;DES:Sony UP-D711MD;CMD:SONY-Original;CLS:PRINTER" driver="sony-upd771" manufacturer="Sony" model="2013" />
+      <printer translate="name" name="Sony UP-D711MD" deviceid="MFG:Sony;MDL:UP-D711MD;DES:Sony UP-D711MD;CMD:SONY-Original;CLS:PRINTER" driver="sony-upd711" manufacturer="Sony" model="2013" />
       <printer translate="name" name="Sony UP-D895" deviceid="MFG:SONY;MDL:UP-D895;DES:Sony UP-D895;CMD:SONY-Original;CLS:PRINTER" driver="sony-upd895" manufacturer="Sony" model="2006" />
       <printer translate="name" name="Sony UP-D897" deviceid="MFG:SONY;MDL:UP-D897;DES:Sony UP-D897;CMD:SONY-Original;CLS:PRINTER" driver="sony-upd897" manufacturer="Sony" model="2007" />
       <printer translate="name" name="Sony UP-D898" driver="sony-upd898" manufacturer="Sony" model="2008" />

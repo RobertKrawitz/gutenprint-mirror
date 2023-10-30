@@ -2333,8 +2333,8 @@ static void sony_up971_printer_init_func(stp_vars_t *v)
   sony_updneo_mono_init_func(v, 0x0126, 0x07b3);
 }
 
-/* Sony UP-D771MD */
-static const dyesub_pagesize_t sony_d771_page[] =
+/* Sony UP-D711MD */
+static const dyesub_pagesize_t sony_d711_page[] =
 {
   DEFINE_PAPER_SIMPLE( "w215h143", "596x896", PT1(596,300), PT1(896,300), DYESUB_LANDSCAPE),
   DEFINE_PAPER_SIMPLE( "w215h161", "672x896",  PT1(672,300), PT1(896,300), DYESUB_LANDSCAPE),
@@ -2345,9 +2345,9 @@ static const dyesub_pagesize_t sony_d771_page[] =
   DEFINE_PAPER_SIMPLE( "Custom", "Custom", PT1(896,300), -1, DYESUB_PORTRAIT),
 };
 
-LIST(dyesub_pagesize_list_t, sony_d771_page_list, dyesub_pagesize_t, sony_d771_page);
+LIST(dyesub_pagesize_list_t, sony_d711_page_list, dyesub_pagesize_t, sony_d711_page);
 
-static const dyesub_printsize_t sony_d771_printsize[] =
+static const dyesub_printsize_t sony_d711_printsize[] =
 {
   { "300x300", "w215h143", 596, 896},
   { "300x300", "w215h161", 672, 896},
@@ -2357,10 +2357,10 @@ static const dyesub_printsize_t sony_d771_printsize[] =
   { "300x300", "Custom", 896, 2688}, /* Maximum */
 };
 
-LIST(dyesub_printsize_list_t, sony_d771_printsize_list, dyesub_printsize_t, sony_d771_printsize);
+LIST(dyesub_printsize_list_t, sony_d711_printsize_list, dyesub_printsize_t, sony_d711_printsize);
 
 
-static void sony_upd771_printer_init_func(stp_vars_t *v)
+static void sony_upd711_printer_init_func(stp_vars_t *v)
 {
   dyesub_privdata_t *pd = get_privdata(v);
 
@@ -2381,7 +2381,7 @@ static void sony_upd771_printer_init_func(stp_vars_t *v)
   stp_put32_le(pd->h_size * pd->w_size, v);
 }
 
-static void sony_upd771_printer_end_func(stp_vars_t *v)
+static void sony_upd711_printer_end_func(stp_vars_t *v)
 {
   dyesub_privdata_t *pd = get_privdata(v);
 
@@ -2455,14 +2455,14 @@ static void sony_upd771_printer_end_func(stp_vars_t *v)
   stp_put32_be(0xf4ffffff, v);
 }
 
-static const dyesub_stringitem_t sony_upd771_medias[] =
+static const dyesub_stringitem_t sony_upd711_medias[] =
 {
   { "S", N_ ("Standard") },
   { "HG", N_ ("High Grade") },
 };
-LIST(dyesub_stringlist_t, sony_upd771_media_list, dyesub_stringitem_t, sony_upd771_medias);
+LIST(dyesub_stringlist_t, sony_upd711_media_list, dyesub_stringitem_t, sony_upd711_medias);
 
-static const stp_parameter_t sony_upd771_parameters[] =
+static const stp_parameter_t sony_upd711_parameters[] =
 {
   {
     "SonyGamma", N_("Printer Gamma Correction"), "Color=No,Category=Advanced Printer Setup",
@@ -2513,10 +2513,10 @@ static const stp_parameter_t sony_upd771_parameters[] =
     STP_PARAMETER_LEVEL_ADVANCED, 1, 1, STP_CHANNEL_NONE, 1, 0
   },
 };
-#define sony_upd771_parameter_count (sizeof(sony_upd771_parameters) / sizeof(const stp_parameter_t))
+#define sony_upd711_parameter_count (sizeof(sony_upd711_parameters) / sizeof(const stp_parameter_t))
 
 static int
-sony_upd771_load_parameters(const stp_vars_t *v, const char *name,
+sony_upd711_load_parameters(const stp_vars_t *v, const char *name,
 			    stp_parameter_t *description)
 {
   int	i;
@@ -2591,7 +2591,7 @@ sony_upd771_load_parameters(const stp_vars_t *v, const char *name,
     {
       description->bounds.str = stp_string_list_create();
 
-      const dyesub_stringlist_t *mlist = &sony_upd771_media_list;
+      const dyesub_stringlist_t *mlist = &sony_upd711_media_list;
       for (i = 0; i < mlist->n_items; i++)
         {
           const dyesub_stringitem_t *m = &(mlist->item[i]);
@@ -2608,7 +2608,7 @@ sony_upd771_load_parameters(const stp_vars_t *v, const char *name,
   return 1;
 }
 
-static int sony_upd771_parse_parameters(stp_vars_t *v)
+static int sony_upd711_parse_parameters(stp_vars_t *v)
 {
   dyesub_privdata_t *pd = get_privdata(v);
   const char *gamma = stp_get_string_parameter(v, "SonyGamma");
@@ -11441,20 +11441,20 @@ static const dyesub_cap_t dyesub_model_capabilities[] =
     2013,
     &w_ink_list,
     &res_300dpi_list,
-    &sony_d771_page_list,
-    &sony_d771_printsize_list,
+    &sony_d711_page_list,
+    &sony_d711_printsize_list,
     SHRT_MAX,
     DYESUB_FEATURE_FULL_WIDTH | DYESUB_FEATURE_FULL_HEIGHT
       | DYESUB_FEATURE_MONOCHROME | DYESUB_FEATURE_NATIVECOPIES | DYESUB_FEATURE_HASBACKEND,
-    &sony_upd771_printer_init_func, &sony_upd771_printer_end_func,
+    &sony_upd711_printer_init_func, &sony_upd711_printer_end_func,
     NULL, NULL,
     NULL, NULL, /* No block funcs */
     NULL, NULL,
     NULL, NULL,
-    sony_upd771_parameters,
-    sony_upd771_parameter_count,
-    sony_upd771_load_parameters,
-    sony_upd771_parse_parameters,
+    sony_upd711_parameters,
+    sony_upd711_parameter_count,
+    sony_upd711_load_parameters,
+    sony_upd711_parse_parameters,
   },
   { /* Fujifilm Printpix CX-400  */
     3000,
