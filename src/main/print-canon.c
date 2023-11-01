@@ -267,7 +267,9 @@ static const canon_mode_t* suitable_mode_color(stp_vars_t *v,const canon_modeuse
 static const canon_mode_t* find_first_matching_mode_color(stp_vars_t *v,const canon_modeuse_t* muse,const canon_cap_t *caps,const char *duplex_mode);
 static const canon_mode_t* suitable_mode_photo(stp_vars_t *v,const canon_modeuse_t* muse,const canon_cap_t *caps,int quality,const char *duplex_mode);
 static const canon_mode_t* find_first_matching_mode_photo(stp_vars_t *v,const canon_modeuse_t* muse,const canon_cap_t *caps,const char *duplex_mode);
+#if 0
 static const canon_mode_t* suitable_mode_general(stp_vars_t *v,const canon_modeuse_t* muse,const canon_cap_t *caps,int quality,const char *duplex_mode);
+#endif
 static const char* find_ink_type(stp_vars_t *v,const canon_mode_t* mode,const char *printing_mode);
 static const canon_mode_t* canon_check_current_mode(stp_vars_t *v);
 
@@ -937,6 +939,7 @@ const canon_mode_t* find_first_matching_mode_photo(stp_vars_t *v,const canon_mod
   return mode;
 }
 
+#if 0
 const canon_mode_t* suitable_mode_general(stp_vars_t *v,const canon_modeuse_t* muse,const canon_cap_t *caps,int quality,const char *duplex_mode) {
   const canon_mode_t* mode=NULL;
   int i=0;
@@ -965,6 +968,7 @@ const canon_mode_t* suitable_mode_general(stp_vars_t *v,const canon_modeuse_t* m
   }
   return mode;
 }
+#endif
 
 const char* find_ink_type(stp_vars_t *v,const canon_mode_t* mode,const char *printing_mode) {
   int i,inkfound;

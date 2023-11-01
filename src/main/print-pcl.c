@@ -1769,7 +1769,7 @@ static const char * pcl_val_to_string(const stp_vars_t *v,
 {
 
   int i;
-  const char *string = NULL;
+  const char *string = "<null>";
 
  /*
   * Look up the code in the table and convert to the string.
@@ -1794,7 +1794,7 @@ static const char * pcl_val_to_text(const stp_vars_t *v,
 {
 
   int i;
-  const char *string = NULL;
+  const char *string = "<null>";
 
  /*
   * Look up the code in the table and convert to the string.

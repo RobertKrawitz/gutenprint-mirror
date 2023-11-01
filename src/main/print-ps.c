@@ -361,9 +361,10 @@ ps_parameters_internal(const stp_vars_t *v, const char *name,
       }
     else
       {
-	char *tmp = stp_malloc(strlen(name) + 4);
+        int tmplen = strlen(name) + 3;
+	char *tmp = stp_malloc(tmplen + 1);
 	strcpy(tmp, "Stp");
-	strncat(tmp, name, strlen(name) + 3);
+	strncat(tmp, name, tmplen);
 	if ((option = stpi_xmlppd_find_option_named(m_ppd, tmp)) == NULL)
 	  {
 	    stp_dprintf(STP_DBG_PS, v, "no parameter %s", name);
@@ -744,9 +745,10 @@ ps_external_options(const stp_vars_t *v)
 	  if (m_ppd &&
 	      (option = stpi_xmlppd_find_option_named(m_ppd, desc.name)) == NULL)
 	    {
-	      ppd_name = stp_malloc(strlen(desc.name) + 4);
+              int tmplen = strlen(desc.name) + 3;
+	      ppd_name = stp_malloc(tmplen + 1);
 	      strcpy(ppd_name, "Stp");
-	      strncat(ppd_name, desc.name, strlen(desc.name) + 3);
+	      strncat(ppd_name, desc.name, tmplen);
 	      if ((option = stpi_xmlppd_find_option_named(m_ppd, ppd_name)) == NULL)
 		{
 		  stp_dprintf(STP_DBG_PS, v, "no parameter %s", desc.name);
