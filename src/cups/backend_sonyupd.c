@@ -392,7 +392,7 @@ static int ndc_read_parse(struct upd_ctx *ctx, struct upd_printjob *job, int dat
 		/* Some special casing */
 		if (job->databuf[job->datalen + 1] == 0x0a)
 			run = 0;
-		else if (job->databuf[job->datalen + 1] == 0x0a)
+		else if (job->databuf[job->datalen + 1] == 0xee)
 			*copies_offset = job->datalen + 7;
 		else if (job->databuf[job->datalen + 1] == 0xe1)
 			param_offset = job->datalen + 14;
@@ -973,7 +973,7 @@ static const char *sonyupd_prefixes[] = {
 
 const struct dyesub_backend sonyupd_backend = {
 	.name = "Sony UP-D",
-	.version = "0.52",
+	.version = "0.53",
 	.uri_prefixes = sonyupd_prefixes,
 	.cmdline_arg = upd_cmdline_arg,
 	.cmdline_usage = upd_cmdline,
