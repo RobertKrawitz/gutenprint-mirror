@@ -358,68 +358,78 @@ static int ndc_read_parse(struct upd_ctx *ctx, struct upd_printjob *job, int dat
 	while(run) {
 		int i;
 		int remain = 0;
-		uint16_t len;
+
+		uint32_t cmdlen;
+		uint8_t  cmdbuf[11];
 
 		/* Read the ESC and command */
-		i = read(data_fd, job->databuf + job->datalen, 2);
+		i = read(data_fd, cmdbuf, 2);
 		if (i < 0) {
 			return CUPS_BACKEND_CANCEL;
 		}
 		if (i == 0)
 			break;
 
-		if (job->databuf[job->datalen] != 0x1b) {
-			ERROR("Unexpected data in stream! (%02x)\n", job->databuf[job->datalen]);
+		if (cmdbuf[0] != 0x1b) {
+			ERROR("Unexpected data in stream! (%02x)\n", cmdbuf[0]);
 			return CUPS_BACKEND_CANCEL;
 		}
 
-		/* Read the rest of the command */
-		switch (job->databuf[job->datalen + 1]) {
-		case 0xea:  // Data transfer
-			remain = 11 - 2;
-			break;
-		default:    // everything else
-			remain = 7 - 2;
-			break;
+		/* Work out command specifics */
+		if (cmdbuf[1] == 0xea) {  // Data transfer
+			cmdlen = 11;
+		} else { // everything else
+			cmdlen = 7;
 		}
 
-		if (job->datalen + remain > MAX_PRINTJOB_LEN) {
+		if (job->datalen + cmdlen > MAX_PRINTJOB_LEN) {
 			ERROR("Buffer overflow when parsing printjob! (%d+%d)\n",
 			      job->datalen, remain);
 			return CUPS_BACKEND_CANCEL;
 		}
 
 		/* Some special casing */
-		if (job->databuf[job->datalen + 1] == 0x0a)
+		if (cmdbuf[1] == 0x0a)
 			run = 0;
-		else if (job->databuf[job->datalen + 1] == 0xee)
-			*copies_offset = job->datalen + 7;
-		else if (job->databuf[job->datalen + 1] == 0xe1)
-			param_offset = job->datalen + 14;
+		else if (cmdbuf[1] == 0xee)
+			*copies_offset = job->datalen + 7 + sizeof(uint32_t)*2;
+		else if (cmdbuf[1] == 0xe1)
+			param_offset = job->datalen + 14 + sizeof(uint32_t)*2;
 
-		i = read(data_fd, job->databuf + job->datalen + 2, remain);
-		if (i != remain) {
+		/* Read remainder of cmd */
+		i = read(data_fd, cmdbuf + 2, cmdlen - 2);
+		if (i != (int)(cmdlen - 2)) {
 			ERROR("Unexpected read length! (%d)\n", i);
 			return CUPS_BACKEND_CANCEL;
 		}
 
-		switch (job->databuf[job->datalen + 1]) {
-		case 0xea: { // Data transfer
-			uint32_t len;
-			memcpy(&len, job->databuf + job->datalen + 6, sizeof(len));
-			len = be32_to_cpu(len);
-			remain = len;
-			job->datalen += 11;
-			job->imglen = len;
-			break;
-		}
-		default: {    // everything else
-			memcpy(&len, job->databuf + job->datalen + 4, sizeof(len));
+		/* Move cmdbuf into job buffer */
+		memcpy(job->databuf + job->datalen, &cmdlen, sizeof(uint32_t));
+		job->datalen += sizeof(uint32_t);
+		memcpy(job->databuf + job->datalen, cmdbuf, cmdlen);
+		job->datalen += cmdlen;
+
+		/* Work out data transfer length */
+		if (cmdbuf[1] == 0xea) { /* Image data transfer */
+			uint32_t datalen;
+			memcpy(&datalen, cmdbuf + 6, sizeof(uint32_t));
+			datalen = be32_to_cpu(datalen);
+			memcpy(job->databuf + job->datalen, &datalen, sizeof(uint32_t));
+			job->datalen += sizeof(uint32_t);
+			remain = datalen;
+
+			job->imglen = datalen;
+		} else {  // everything else
+			uint32_t datalen;
+			uint16_t len;
+			memcpy(&len, cmdbuf + 4, sizeof(uint16_t));
 			len = be16_to_cpu(len);
-			job->datalen += 7;
+			if (len) {
+				datalen = len;
+				memcpy(job->databuf + job->datalen, &datalen, sizeof(uint32_t));
+				job->datalen += sizeof(uint32_t);
+			}
 			remain = len;
-			break;
-		}
 		}
 
 		if(dyesub_debug)
@@ -933,7 +943,7 @@ static int upd_query_markers(void *vctx, struct marker **markers, int *count)
 		return CUPS_BACKEND_FAILED;
 
 	if (ctx->native_bpp != 1 && (ret = sony_get_prints(ctx, &ctx->printbuf))) {
-		return CUPS_BACKEND_FAILED;
+		return ret;
 	}
 
 	if (ctx->conn->type == P_SONY_UPD711) {
@@ -973,7 +983,7 @@ static const char *sonyupd_prefixes[] = {
 
 const struct dyesub_backend sonyupd_backend = {
 	.name = "Sony UP-D",
-	.version = "0.53",
+	.version = "0.54",
 	.uri_prefixes = sonyupd_prefixes,
 	.cmdline_arg = upd_cmdline_arg,
 	.cmdline_usage = upd_cmdline,
