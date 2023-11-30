@@ -385,7 +385,7 @@ static const char *mitsud90_mecha_statuses(const uint8_t *code)
 		// codes seen:
 		// 22  30 31 32 33 34 35 37 38  <-- Side A?
 		// 42  50 51 52 53    55 57 58  <-- Side B?
-		// 60  <-- feeding?
+		// 60  <-- Finish?
 		return "Printing (Unknown)";
 	case D90_MECHA_STATUS_PRINTING:
 		switch (code[1]) {
@@ -716,9 +716,11 @@ static int mitsud90_query_fwver(struct mitsud90_ctx *ctx)
 	ret = read_data(ctx->conn,
 			(uint8_t*) &resp, sizeof(resp), &num);
 
+	if (ret)
+		return CUPS_BACKEND_FAILED;
+
 	memcpy(ctx->fwver, resp.fw_ver.version, 6);
 	ctx->fwver[6] = 0;
-
 
 	return CUPS_BACKEND_OK;
 }
@@ -745,12 +747,14 @@ static int mitsuw5k_get_serno(struct mitsud90_ctx *ctx)
 	ret = read_data(ctx->conn,
 			cmdbuf, sizeof(cmdbuf), &num);
 
+	if (ret)
+		return CUPS_BACKEND_FAILED;
+
 	memcpy(ctx->serno, cmdbuf + 4, sizeof(cmdbuf)-4);
 	ctx->serno[sizeof(cmdbuf)-4-1] = 0;
 
 	return CUPS_BACKEND_OK;
 }
-
 
 static int mitsud90_get_serno(struct mitsud90_ctx *ctx)
 {
@@ -870,11 +874,12 @@ static int mitsud90_attach(void *vctx, struct dyesub_connection *conn, uint8_t j
 static void mitsud90_teardown(void *vctx) {
 	struct mitsud90_ctx *ctx = vctx;
 
+	if (!ctx)
+		return;
+
 	if (ctx->pano_page) {
 		WARNING("Panorama state left dangling!\n");
 	}
-	if (!ctx)
-		return;
 
 	if (ctx->conn->type == P_MITSU_M1 ||
 	    ctx->conn->type == P_FUJI_ASK500) {
@@ -2397,7 +2402,7 @@ static const char *mitsud90_prefixes[] = {
 /* Exported */
 const struct dyesub_backend mitsud90_backend = {
 	.name = "Mitsubishi CP-D90/CP-M1/CP-W5000",
-	.version = "0.44"  " (lib " LIBMITSU_VER ")",
+	.version = "0.45"  " (lib " LIBMITSU_VER ")",
 	.uri_prefixes = mitsud90_prefixes,
 	.cmdline_arg = mitsud90_cmdline_arg,
 	.cmdline_usage = mitsud90_cmdline,
