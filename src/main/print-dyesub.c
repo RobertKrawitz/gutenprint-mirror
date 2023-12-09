@@ -10217,7 +10217,7 @@ hiti_p461_load_parameters(const stp_vars_t *v, const char *name,
     {
       description->deflt.integer = 0;
       description->bounds.integer.lower = 0;
-      description->bounds.integer.upper = 1;
+      description->bounds.integer.upper = 2;
       description->is_active = 1;
     }
   else
