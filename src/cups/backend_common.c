@@ -29,7 +29,7 @@
 #include <signal.h>
 #include <strings.h>  /* For strncasecmp */
 
-#define BACKEND_VERSION "0.125G"
+#define BACKEND_VERSION "0.126G"
 
 #ifndef CORRTABLE_PATH
 #ifdef PACKAGE_DATA_DIR
@@ -1096,7 +1096,7 @@ void print_help(const char *argv0, const struct dyesub_backend *backend)
 	libusb_free_device_list(list, 1);
 }
 
-static int parse_cmdstream(struct dyesub_backend *backend, void *backend_ctx, int fd)
+static int parse_cmdstream(const struct dyesub_backend *backend, void *backend_ctx, int fd)
 {
 	FILE *fp = stdin;
 	char line[128];
@@ -1137,7 +1137,7 @@ static int parse_cmdstream(struct dyesub_backend *backend, void *backend_ctx, in
 }
 
 static int handle_input(struct dyesub_backend *backend, void *backend_ctx,
-			const char *fname, char *uri, char *type)
+			const char *fname, const char *uri, const char *type)
 {
 	int ret = CUPS_BACKEND_OK;
 	int i;
@@ -1724,14 +1724,15 @@ minimal:
 	}
 }
 
-int dyesub_read_file(const char *filename, void *databuf, int datalen,
-		     int *actual_len)
+int dyesub_read_file2(const char *filename, void *databuf, int datalen,
+		      int *actual_len, int fail_ok)
 {
 	int len;
 	int fd = open(filename, O_RDONLY);
 
 	if (fd < 0) {
-		ERROR("Unable to open '%s'\n", filename);
+		if (!fail_ok)
+			ERROR("Unable to open '%s'\n", filename);
 		return CUPS_BACKEND_FAILED;
 	}
 	len = read(fd, databuf, datalen);

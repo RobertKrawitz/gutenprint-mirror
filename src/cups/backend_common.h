@@ -140,12 +140,15 @@ enum {
 	P_KODAK_8810,
 	P_MAGICARD,
 	P_NDC,
+	P_MITSU_9500S,
 	P_MITSU_9550,
 	P_MITSU_9550S,
 	P_MITSU_9600,
+	P_MITSU_9600S,
 	P_MITSU_9800,
 	P_MITSU_9800S,
 	P_MITSU_9810,
+	P_MITSU_9820S,
 	P_MITSU_D70X,
 	P_MITSU_D80,
 	P_MITSU_D90,
@@ -253,8 +256,11 @@ void dump_markers(const struct marker *markers, int marker_count, int full);
 void print_license_blurb(void);
 void print_help(const char *argv0, const struct dyesub_backend *backend);
 
-int dyesub_read_file(const char *filename, void *databuf, int datalen,
-		     int *actual_len);
+int dyesub_read_file2(const char *filename, void *databuf, int datalen,
+		      int *actual_len, int fail_ok);
+
+#define dyesub_read_file(__fname, __databuf, __datalen, __actual_len) \
+	dyesub_read_file2(__fname, __databuf, __datalen, __actual_len, 0)
 
 uint16_t uint16_to_packed_bcd(uint16_t val);
 uint32_t packed_bcd_to_uint32(const char *in, int len);

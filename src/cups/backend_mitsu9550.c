@@ -1,7 +1,7 @@
 /*
  *   Mitsubishi CP-9xxx Photo Printer Family CUPS backend
  *
- *   (c) 2014-2021 Solomon Peachy <pizza@shaftnet.org>
+ *   (c) 2014-2023 Solomon Peachy <pizza@shaftnet.org>
  *
  *   The latest version of this program can be found at:
  *
@@ -227,9 +227,9 @@ static const char *cp30_media_types(uint16_t remain)
 #define READBACK_LEN 128
 
 #define QUERY_STATUS_I							\
-	struct mitsu9550_status *sts = (struct mitsu9550_status*) rdbuf; \
-	struct mitsucp30_status *sts30 = (struct mitsucp30_status*) rdbuf; \
-	struct mitsu9550_media *media = (struct mitsu9550_media *) rdbuf; \
+	const struct mitsu9550_status *sts = (struct mitsu9550_status*) rdbuf; \
+	const struct mitsucp30_status *sts30 = (struct mitsucp30_status*) rdbuf; \
+	const struct mitsu9550_media *media = (struct mitsu9550_media *) rdbuf; \
 	uint16_t donor;							\
 	/* media */							\
 	ret = mitsu9550_get_status(ctx, rdbuf, CP9XXX_STS_MEDIA);	\
@@ -310,8 +310,8 @@ static int mitsu98xx_fillmatte(struct mitsu9550_printjob *job)
 	matte->cmd[3] = 0x10;
 	matte->row_offset = 0;
 	matte->col_offset = 0;
-	matte->cols = cpu_to_be16(job->hdr1.cols);
-	matte->rows = cpu_to_be16(job->hdr1.rows);
+	matte->cols = cpu_to_be16(job->cols);
+	matte->rows = cpu_to_be16(job->rows);
 	job->datalen += sizeof(struct mitsu9550_plane);
 
 	ret = mitsu_readlamdata(MITSU_M98xx_LAMINATE_FILE, LAMINATE_STRIDE,
@@ -353,12 +353,16 @@ static int mitsu9550_attach(void *vctx, struct dyesub_connection *conn, uint8_t 
 
 	ctx->conn = conn;
 
-	if (ctx->conn->type == P_MITSU_9550S ||
-	    ctx->conn->type == P_MITSU_9800S)
+	if (ctx->conn->type == P_MITSU_9500S ||
+	    ctx->conn->type == P_MITSU_9550S ||
+	    ctx->conn->type == P_MITSU_9600S ||
+	    ctx->conn->type == P_MITSU_9800S ||
+	    ctx->conn->type == P_MITSU_9820S)
 		ctx->is_s = 1;
 
 	if (ctx->conn->type == P_MITSU_9800 ||
 	    ctx->conn->type == P_MITSU_9800S ||
+	    ctx->conn->type == P_MITSU_9820S ||
 	    ctx->conn->type == P_MITSU_9810) {
 		ctx->is_98xx = 1;
 		ctx->need_lib = 1;
@@ -448,8 +452,8 @@ static void mitsu9550_teardown(void *vctx) {
 static int mitsu9550_read_parse(void *vctx, const void **vjob, int data_fd, int copies) {
 	struct mitsu9550_ctx *ctx = vctx;
 	uint8_t buf[sizeof(struct mitsu9550_hdr1)];
-	int remain, i;
-	uint32_t planelen = 0;
+	int planes = 3, i;
+	uint32_t planelen = 0, remain = 0;
 
 	struct mitsu9550_printjob *job = NULL;
 
@@ -462,15 +466,44 @@ static int mitsu9550_read_parse(void *vctx, const void **vjob, int data_fd, int 
 		return CUPS_BACKEND_RETRY_CURRENT;
 	}
 	memset(job, 0, sizeof(*job));
-	job->is_raw = 1;
+	job->is_raw = 0;
 	job->common.jobsize = sizeof(*job);
 	job->common.copies = copies;
 
 top:
-	/* Read in initial header */
-	remain = sizeof(buf);
-	while (remain > 0) {
-		i = read(data_fd, buf + sizeof(buf) - remain, remain);
+	/* Read in first two bytes */
+	i = read(data_fd, buf, 2);
+	if (i == 0) {
+		mitsu9550_cleanup_job(job);
+		return CUPS_BACKEND_CANCEL;
+	}
+	if (i < 0) {
+		mitsu9550_cleanup_job(job);
+		return CUPS_BACKEND_CANCEL;
+	}
+	if (buf[0] != 0x1b) {
+		ERROR("Unrecognized cmd sequence (%02x %02x)!\n",
+		      buf[0], buf[1]);
+		mitsu9550_cleanup_job(job);
+		return CUPS_BACKEND_CANCEL;
+	}
+	switch (buf[1]) {
+	case 0x57:
+		remain = sizeof(buf) - 2;
+		break;
+	case 0x5a:
+		remain = sizeof(struct mitsu9550_plane) - 2;
+		break;
+	default:
+		ERROR("Unrecognized cmd sequence (%02x %02x)!\n",
+		      buf[0], buf[1]);
+		mitsu9550_cleanup_job(job);
+		return CUPS_BACKEND_CANCEL;
+	}
+
+	/* Read in remainder of header */
+	while (remain) {
+		i = read(data_fd, buf + 2, remain);
 		if (i == 0) {
 			mitsu9550_cleanup_job(job);
 			return CUPS_BACKEND_CANCEL;
@@ -482,30 +515,18 @@ top:
 		remain -= i;
 	}
 
-	/* Sanity check */
-	if (buf[0] != 0x1b || buf[1] != 0x57 || buf[3] != 0x2e) {
-		if (!job->hdr1_present || !job->hdr2_present) {
-			ERROR("Unrecognized data format (%02x%02x%02x%02x)!\n",
-			      buf[0], buf[1], buf[2], buf[3]);
-			mitsu9550_cleanup_job(job);
-			return CUPS_BACKEND_CANCEL;
-		} else if (buf[0] == 0x1b &&
-			   buf[1] == 0x5a &&
-			   buf[2] == 0x54) {
-
-			/* We're in the data portion now */
-			if (buf[3] == 0x10)
-				planelen *= 2;
-			else if (ctx->is_98xx && buf[3] == 0x80)
-				job->is_raw = 0;
-
-			goto hdr_done;
-		} else {
-			ERROR("Unrecognized data block (%02x%02x%02x%02x)!\n",
-			      buf[0], buf[1], buf[2], buf[3]);
-			mitsu9550_cleanup_job(job);
-			return CUPS_BACKEND_CANCEL;
+	if (buf[1] == 0x5a) {
+		/* We're in the data portion now, bail on header processing */
+		if (ctx->is_98xx && buf[3] == 0x10) {
+			job->is_raw = 1;
+			planelen *= 2;
+			if (job->hdr1.matte)
+				planes ++;
+		} else if (ctx->is_98xx && buf[3] == 0x80) {
+			planelen *= 3;
+			planes = 1;
 		}
+		goto hdr_done;
 	}
 
 	switch(buf[2]) {
@@ -542,6 +563,27 @@ top:
 
 hdr_done:
 
+	/* 9550S/9800S doesn't typically sent over hdr4! */
+	if (ctx->conn->type == P_MITSU_9500S ||
+	    ctx->conn->type == P_MITSU_9550S ||
+	    ctx->conn->type == P_MITSU_9600S ||
+	    ctx->conn->type == P_MITSU_9800S ||
+	    ctx->conn->type == P_MITSU_9820S) {
+		/* XXX Has to do with error policy, but not sure what.
+		   Mitsu9550-S/9800-S will set this based on a command,
+		   but it's not part of the standard job spool */
+		job->hdr4_present = 0;
+	}
+
+	/* Disable matte if the printer doesn't support it */
+	if (job->hdr1.matte) {
+		if (ctx->conn->type != P_MITSU_9810 &&
+		    ctx->conn->type != P_MITSU_9820S) {
+			WARNING("Matte not supported on this printer, disabling\n");
+			job->hdr1.matte = 0;
+		}
+	}
+
 	/* Read in CP98xx data tables if necessary */
 	if (ctx->is_98xx && !job->is_raw && !ctx->m98xxdata) {
 		char full[2048];
@@ -561,37 +603,8 @@ hdr_done:
 		}
 	}
 
-	if (job->is_raw) {
-		/* We have three planes + headers and the final terminator to read */
-		remain = 3 * (planelen + sizeof(struct mitsu9550_plane)) + ctx->footer_len;
-	} else {
-		/* We have one plane + header and the final terminator to read */
-		remain = planelen * 3 + sizeof(struct mitsu9550_plane) +  ctx->footer_len;
-	}
-
-	/* Mitsu9600 windows spool uses more, smaller blocks, but plane data is the same */
-	if (ctx->conn->type == P_MITSU_9600) {
-		remain += 128 * sizeof(struct mitsu9550_plane); /* 39 extra seen on 4x6" */
-	}
-
-	/* 9550S/9800S doesn't typically sent over hdr4! */
-	if (ctx->conn->type == P_MITSU_9550S ||
-	    ctx->conn->type == P_MITSU_9800S) {
-		/* XXX Has to do with error policy, but not sure what.
-		   Mitsu9550-S/9800-S will set this based on a command,
-		   but it's not part of the standard job spool */
-		job->hdr4_present = 0;
-	}
-
-	/* Disable matte if the printer doesn't support it */
-	if (job->hdr1.matte) {
-		if (ctx->conn->type != P_MITSU_9810) {
-			WARNING("Matte not supported on this printer, disabling\n");
-			job->hdr1.matte = 0;
-		} else if (job->is_raw) {
-			remain += planelen + sizeof(struct mitsu9550_plane) + sizeof(struct mitsu9550_cmd);
-		}
-	}
+	/* Work out the raw job size */
+	remain = planes * (planelen + sizeof(struct mitsu9550_plane)) + (ctx->footer_len * (job->hdr1.matte ? 2 : 1));
 
 	/* Allocate buffer for the payload */
 	job->datalen = 0;
@@ -603,7 +616,7 @@ hdr_done:
 	}
 
 	/* Load up the data blocks.*/
-	while(1) {
+	while(planes--) {
 		/* Note that 'buf' needs to be already filled here! */
 		struct mitsu9550_plane *plane = (struct mitsu9550_plane *)buf;
 
@@ -619,20 +632,29 @@ hdr_done:
 		}
 
 		/* Work out the length of this block */
-		planelen = be16_to_cpu(plane->rows) * be16_to_cpu(plane->cols);
+		remain = be16_to_cpu(plane->rows) * be16_to_cpu(plane->cols);
 		if (plane->cmd[3] == 0x10)
-			planelen *= 2;
+			remain *= 2;
 		if (plane->cmd[3] == 0x80)
-			planelen *= 3;
+			remain *= 3;
 
-		/* Copy plane header into buffer */
-		memcpy(job->databuf + job->datalen, buf, sizeof(buf));
-		job->datalen += sizeof(buf);
-		planelen -= sizeof(buf) - sizeof(struct mitsu9550_plane);
+		if (planelen != remain) {
+			ERROR("Plane length mismatch! job %d vs plane %d\n", planelen, remain);
+			mitsu9550_cleanup_job(job);
+			return CUPS_BACKEND_CANCEL;
+		}
 
-		/* Read in the spool data */
-		while(planelen > 0) {
-			i = read(data_fd, job->databuf + job->datalen, planelen);
+		/* Move plane header into job buffer */
+		memcpy(job->databuf + job->datalen, buf, sizeof(struct mitsu9550_plane));
+		job->datalen += sizeof(struct mitsu9550_plane);
+
+		/* Final plane and Matte plane get an additional footer */
+		if (planes == 0 || (planes == 1 && job->hdr1.matte && job->is_raw))
+			remain += ctx->footer_len;
+
+		/* Read in the plane data */
+		while(remain) {
+			i = read(data_fd, job->databuf + job->datalen, remain);
 			if (i == 0) {
 				mitsu9550_cleanup_job(job);
 				return CUPS_BACKEND_CANCEL;
@@ -642,45 +664,16 @@ hdr_done:
 				return CUPS_BACKEND_CANCEL;
 			}
 			job->datalen += i;
-			planelen -= i;
+			remain -= i;
 		}
 
-		/* Try to read in the next chunk.  It will be one of:
-		    - Additional block header (12B)
-		    - Job footer (4B)
-		*/
-		i = read(data_fd, buf, ctx->footer_len);
-		if (i == 0) {
-			mitsu9550_cleanup_job(job);
-			return CUPS_BACKEND_CANCEL;
-		}
-		if (i < 0) {
-			mitsu9550_cleanup_job(job);
-			return CUPS_BACKEND_CANCEL;
-		}
 
-		/* Is this a "job end" marker? */
-		if (plane->cmd[0] == 0x1b &&
-		    plane->cmd[1] == 0x50 &&
-		    plane->cmd[3] == 0x00) {
-			/* store it in the buffer */
-			memcpy(job->databuf + job->datalen, buf, ctx->footer_len);
-			job->datalen += ctx->footer_len;
+		/* If we're not done with our planes, read the next header */
+		if (planes)
+			remain = sizeof(struct mitsu9550_plane);
 
-			/* Unless we have a raw matte plane following,
-			   we're done */
-			if (job->hdr1.matte != 0x01 ||
-			    !job->is_raw)
-				break;
-			remain = sizeof(buf);
-		} else {
-			/* It's part of a block header, mark what we've read */
-			remain = sizeof(buf) - ctx->footer_len;
-		}
-
-		/* Read in the rest of the header */
-		while (remain > 0) {
-			i = read(data_fd, buf + sizeof(buf) - remain, remain);
+		while (remain) {
+			i = read(data_fd, buf + sizeof(struct mitsu9550_plane) - remain, remain);
 			if (i == 0) {
 				mitsu9550_cleanup_job(job);
 				return CUPS_BACKEND_CANCEL;
@@ -701,11 +694,11 @@ hdr_done:
 	if (ctx->lut_fname && !job->is_raw && job->hdr2.unkc[9]) {
 		int ret;
 		if (ctx->conn->type == P_MITSU_CP30D) {
-			uint32_t planelen = job->rows * job->cols + sizeof(struct mitsu9550_plane);
+			uint32_t plen = job->rows * job->cols + sizeof(struct mitsu9550_plane);
 			ret = mitsu_apply3dlut_plane(&ctx->lib, ctx->lut_fname,
 						     job->databuf + sizeof(struct mitsu9550_plane),
-						     job->databuf + (planelen + sizeof(struct mitsu9550_plane)),
-						     job->databuf + (planelen * 2 + sizeof(struct mitsu9550_plane)),
+						     job->databuf + (plen + sizeof(struct mitsu9550_plane)),
+						     job->databuf + (plen * 2 + sizeof(struct mitsu9550_plane)),
 						     job->cols, job->rows);
 		} else {
 			ret = mitsu_apply3dlut_packed(&ctx->lib, ctx->lut_fname,
@@ -840,6 +833,7 @@ static int validate_media(int type, int media, int cols, int rows)
 			break;
 		}
 		break;
+	case P_MITSU_9500S:
 	case P_MITSU_9550S:
 		switch(media & 0xf) {
 		case 0x02: /* 4x6 */
@@ -871,7 +865,8 @@ static int validate_media(int type, int media, int cols, int rows)
 			break;
 		}
 		break;
-	case P_MITSU_9600: // XXX 9600S doesn't support 5" media at all!
+	case P_MITSU_9600:
+	case P_MITSU_9600S:
 		switch(media & 0xf) {
 		case 0x01: /* 3.5x5 */
 			if (cols == 1572) {
@@ -926,7 +921,6 @@ static int validate_media(int type, int media, int cols, int rows)
 		break;
 	case P_MITSU_9800:
 	case P_MITSU_9810:
-//	case P_MITSU_9820S:
 		switch(media & 0xf) {
 		case 0x01: /* 3.5x5 */
 			if (cols != 1572 && rows != 1076)
@@ -960,6 +954,7 @@ static int validate_media(int type, int media, int cols, int rows)
 		}
 		break;
 	case P_MITSU_9800S:
+	case P_MITSU_9820S:
 		switch(media & 0xf) {
 		case 0x02: /* 4x6 */
 		case 0x03: /* 4x6 postcard */
@@ -1108,9 +1103,9 @@ static int mitsu9550_main_loop(void *vctx, const void *vjob, int wait_for_return
 
 	for (offset = 0, i = 0; i < output.rows ; i++) {
 		for (j = 0 ; j < output.cols ; j ++, offset += 3) {
-			yPtr[i*output.cols + j] = convbuf[0 + offset];
-			mPtr[i*output.cols + j] = convbuf[1 + offset];
-			cPtr[i*output.cols + j] = convbuf[2 + offset];
+			((uint16_t*)yPtr)[i*output.cols + j] = ((uint16_t*)convbuf)[0 + offset];
+			((uint16_t*)mPtr)[i*output.cols + j] = ((uint16_t*)convbuf)[1 + offset];
+			((uint16_t*)cPtr)[i*output.cols + j] = ((uint16_t*)convbuf)[2 + offset];
 		}
 	}
 
@@ -1168,7 +1163,8 @@ top:
 		// XXX no idea how to interpret this.
 	}
 
-	if (ctx->conn->type == P_MITSU_9800S) {
+	if (ctx->conn->type == P_MITSU_9800S ||
+	    ctx->conn->type == P_MITSU_9820S) {
 		int num;
 
 		/* Send "unknown query 2" command */
@@ -1260,7 +1256,26 @@ top:
 	}
 
 	/* Send "end data" command */
-	if (ctx->conn->type == P_MITSU_9550S) {
+	if (getenv("CP9XXXX_START")) {
+		cmd.cmd[0] = 0x1b;
+		cmd.cmd[1] = 0x50;
+		cmd.cmd[2] = strtol(getenv("CP9XXXX_START"), NULL, 16);
+		cmd.cmd[3] = 0x00;
+
+		DEBUG("CP9XXXX Override start = 0x%02x\n", cmd.cmd[2]);
+		if ((ret = send_data(ctx->conn,
+				     (uint8_t*) &cmd, sizeof(cmd))))
+			return CUPS_BACKEND_FAILED;
+	} else if (ctx->conn->type == P_MITSU_9500S) {
+		/* Override spool, which may be wrong */
+		cmd.cmd[0] = 0x1b;
+		cmd.cmd[1] = 0x50;
+		cmd.cmd[2] = 0x45;
+		cmd.cmd[3] = 0x00;
+		if ((ret = send_data(ctx->conn,
+				     (uint8_t*) &cmd, sizeof(cmd))))
+			return CUPS_BACKEND_FAILED;
+	} else if (ctx->conn->type == P_MITSU_9550S) {
 		/* Override spool, which may be wrong */
 		cmd.cmd[0] = 0x1b;
 		cmd.cmd[1] = 0x50;
@@ -1269,7 +1284,17 @@ top:
 		if ((ret = send_data(ctx->conn,
 				     (uint8_t*) &cmd, sizeof(cmd))))
 			return CUPS_BACKEND_FAILED;
-	} else if (ctx->conn->type == P_MITSU_9800S) {
+	} else if (ctx->conn->type == P_MITSU_9600S) {
+		/* Override spool, which may be wrong */
+		cmd.cmd[0] = 0x1b;
+		cmd.cmd[1] = 0x50;
+		cmd.cmd[2] = 0x49;
+		cmd.cmd[3] = 0x00;
+		if ((ret = send_data(ctx->conn,
+				     (uint8_t*) &cmd, sizeof(cmd))))
+			return CUPS_BACKEND_FAILED;
+	} else if (ctx->conn->type == P_MITSU_9800S ||
+		   ctx->conn->type == P_MITSU_9820S) {
 		/* Override spool, which may be wrong */
 		cmd.cmd[0] = 0x1b;
 		cmd.cmd[1] = 0x50;
@@ -1468,10 +1493,14 @@ static int mitsu9550_query_statusX(struct mitsu9550_ctx *ctx)
 	}
 #else
 	ret = mitsu9550_get_status(ctx, (uint8_t*) &resp, CP9XXX_STS_x20);
-	ret = mitsu9550_get_status(ctx, (uint8_t*) &resp, CP9XXX_STS_FWVER);
-	ret = mitsu9550_get_status(ctx, (uint8_t*) &resp, CP9XXX_STS_x22);
-	ret = mitsu9550_get_status(ctx, (uint8_t*) &resp, CP9XXX_STS_x26);
-	ret = mitsu9550_get_status(ctx, (uint8_t*) &resp, CP9XXX_STS_x32);
+	if (!ret)
+		ret = mitsu9550_get_status(ctx, (uint8_t*) &resp, CP9XXX_STS_FWVER);
+	if (!ret)
+		ret = mitsu9550_get_status(ctx, (uint8_t*) &resp, CP9XXX_STS_x22);
+	if (!ret)
+		ret = mitsu9550_get_status(ctx, (uint8_t*) &resp, CP9XXX_STS_x26);
+	if (!ret)
+		ret = mitsu9550_get_status(ctx, (uint8_t*) &resp, CP9XXX_STS_x32);
 #endif
 	return ret;
 }
@@ -1612,7 +1641,7 @@ static const char *mitsu9550_prefixes[] = {
 /* Exported */
 const struct dyesub_backend mitsu9550_backend = {
 	.name = "Mitsubishi CP9xxx family",
-	.version = "0.63" " (lib " LIBMITSU_VER ")",
+	.version = "0.70" " (lib " LIBMITSU_VER ")",
 	.uri_prefixes = mitsu9550_prefixes,
 	.cmdline_usage = mitsu9550_cmdline,
 	.cmdline_arg = mitsu9550_cmdline_arg,
@@ -1625,23 +1654,32 @@ const struct dyesub_backend mitsu9550_backend = {
 	.query_serno = mitsu9550_query_serno,
 	.query_markers = mitsu9550_query_markers,
 	.devices = {
+//		{ 0x06d3, 0x0380, P_MITSU_9550, NULL, "mitsubishi-8000d"},
+//		{ 0x06d3, 0x0381, P_MITSU_9550, NULL, "mitsubishi-770d"},
+//		{ 0x06d3, 0x0385, P_MITSU_9550, NULL, "mitsubishi-900d"},
+//		{ 0x06d3, 0x0387, P_MITSU_9550, NULL, "mitsubishi-980d"},
+//		{ 0x06d3, 0x038b, P_MITSU_CP3020, NULL, "mitsubishi-cp3020d"},
+//		{ 0x06d3, 0x038c, P_MITSU_9550, NULL, "mitsubishi-900did"},
 		{ 0x06d3, 0x0395, P_MITSU_9550, NULL, "mitsubishi-9000dw"}, // XXX -am instead?
-		{ 0x06d3, 0x0394, P_MITSU_9550, NULL, "mitsubishi-9000dw"},
 		{ 0x06d3, 0x0393, P_MITSU_9550, NULL, "mitsubishi-9500dw"},
+		{ 0x06d3, 0x0394, P_MITSU_9550, NULL, "mitsubishi-9000dw"},
+		{ 0x06d3, 0x039e, P_MITSU_9500S, NULL, "mitsubishi-9500dw-s"},
 		{ 0x06d3, 0x03a1, P_MITSU_9550, NULL, "mitsubishi-9550dw"},
 		{ 0x06d3, 0x03a1, P_MITSU_9550, NULL, "mitsubishi-9550d"}, /* Duplicate */
 		{ 0x06d3, 0x03a5, P_MITSU_9550S, NULL, "mitsubishi-9550dw-s"}, // or DZ/DZS/DZU
 		{ 0x06d3, 0x03a5, P_MITSU_9550S, NULL, "mitsubishi-9550dz"}, /* Duplicate */
+		{ 0x06d3, 0x03a6, P_MITSU_9600S, NULL, "mitsubishi-9600dw-s"},
 		{ 0x06d3, 0x03a9, P_MITSU_9600, NULL, "mitsubishi-9600dw"},
-//	{ 0x06d3, USB_PID_MITSU_9600D, P_MITSU_9600S, NULL, "mitsubishi-9600dw-s"},
+//		{ 0x06d3, 0x03aa, P_MITSU_CP3020, NULL, "mitsubishi-cp3020da"},
 		{ 0x06d3, 0x03ab, P_MITSU_CP30D, NULL, "mitsubishi-cp30dw"},
 		{ 0x06d3, 0x03ad, P_MITSU_9800, NULL, "mitsubishi-9800dw"},
 		{ 0x06d3, 0x03ad, P_MITSU_9800, NULL, "mitsubishi-9800d"}, /* Duplicate */
 		{ 0x06d3, 0x03ae, P_MITSU_9800S, NULL, "mitsubishi-9800dw-s"},
 		{ 0x06d3, 0x03ae, P_MITSU_9800S, NULL, "mitsubishi-9800dz"}, /* Duplicate */
+		{ 0x06d3, 0x3b20, P_MITSU_9820S, NULL, "mitsubishi-9820dw-ag"},
 		{ 0x06d3, 0x3b21, P_MITSU_9810, NULL, "mitsubishi-9810dw"},
 		{ 0x06d3, 0x3b21, P_MITSU_9810, NULL, "mitsubishi-9810d"}, /* Duplicate */
-//	{ 0x06d3, USB_PID_MITSU_9820DS, P_MITSU_9820S, NULL, "mitsubishi-9820dw-s"},
+//		{ 0x06d3, 0x3b2f, P_MITSU_9810, NULL, "mitsubishi-ls9820a"},
 		{ 0, 0, 0, NULL, NULL}
 	}
 };
@@ -1714,17 +1752,17 @@ const struct dyesub_backend mitsu9550_backend = {
   ~~~~ Footer:
 
    1b 50 41 00  (9500AM)
+   1b 50 45 00  (9500-S)
    1b 50 46 00  (9550)
    1b 50 47 00  (9550-S)
    1b 50 48 00  (9600)
+   1b 50 49 00  (9600-S)
    1b 50 4c 00  (9800/9810)
    1b 50 4d 00  (9000)
-   1b 50 4e 00  (9800-S)
+   1b 50 4e 00  (9800-S, 9820-S)  (#170/aa,173,174,180/b4,183)
    1b 50 51 00  (CP3020DA)
    1b 50 57 00  (9500)
    1b 50 52 00 00 00 (CP30)
-
-   Unknown: 9600-S, 9820-S, 1 other..
 
   ~~~~ Lamination data follows (on 9810 only, if matte selected)
 

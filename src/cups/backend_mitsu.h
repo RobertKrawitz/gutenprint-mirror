@@ -1,7 +1,7 @@
 /*
  *   Mitsubishi Photo Printer Comon Code
  *
- *   (c) 2013-2021 Solomon Peachy <pizza@shaftnet.org>
+ *   (c) 2013-2023 Solomon Peachy <pizza@shaftnet.org>
  *
  *   The latest version of this program can be found at:
  *
@@ -80,7 +80,7 @@ typedef void (*M1_Gamma8to14FN)(const struct M1CPCData *cpc,
 typedef int (*M1_CLocalEnhancerFN)(const struct M1CPCData *cpc,
 				   int sharp, struct BandImage *img);
 typedef int (*M1_CalcRGBRateFN)(uint16_t rows, uint16_t cols, uint8_t *data);
-typedef uint8_t (*M1_CalcOpRateMatteFN)(uint16_t rows, uint16_t cols, uint8_t *data);
+typedef uint8_t (*M1_CalcOpRateMatteFN)(uint16_t rows, uint16_t cols, const uint8_t *data);
 typedef uint8_t (*M1_CalcOpRateGlossFN)(uint16_t rows, uint16_t cols);
 
 typedef struct mitsu_cpd30_data *(*CPD30_GetDataFN)(const char *filename);

@@ -222,11 +222,17 @@
 # Mitsubishi CP-9500D
 0x06d3 0x0393 blacklist
 
+# Mitsubishi CP-9500DZ/DW-S
+0x06d3 0x039e blacklist
+
 # Mitsubishi CP-9550D/DW
 0x06d3 0x03a1 blacklist
 
 # Mitsubishi CP-9550DZ/DW-S
 0x06d3 0x03a5 blacklist
+
+# Mitsubishi CP-9600DZ/DW-S
+0x06d3 0x03a6 blacklist
 
 # Mitsubishi CP-9600D/DW
 0x06d3 0x03a9 blacklist
@@ -239,6 +245,9 @@
 
 # Mitsubishi CP-9800DW-S
 0x06d3 0x03ae blacklist
+
+# Mitsubishi CP-9820DW-AG
+0x06d3 0x3b20 blacklist
 
 # Mitsubishi CP-9810D/DW
 0x06d3 0x3b21 blacklist
