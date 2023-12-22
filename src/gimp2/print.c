@@ -114,8 +114,8 @@ stpui_get_thumbnail_data_function(void *image_ID, gint *width, gint *height,
 {
   if (gimp_thumbnail_data)
     g_free(gimp_thumbnail_data);
-  gint x = gimp_image_width(image_ID);
-  gint y = gimp_image_height(image_ID);
+  gint x = gimp_image_width(p2gint(image_ID));
+  gint y = gimp_image_height(p2gint(image_ID));
 
   /* GIMP limits thumbnails to 1024px! */
   if (*width > 1024)
