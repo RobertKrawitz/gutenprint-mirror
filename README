@@ -59,9 +59,9 @@ II) INSTALLATION
     administrative actions, we recommend that you not attempt to
     install this package from source.
 
-    If you are building Gutenprint from the CVS repository, you need
+    If you are building Gutenprint from the git repository, you need
     to take some additional steps.  Please read doc/README.maintaining
-    for instructions on how to build from CVS.
+    for instructions on how to build directly from git.
 
     Before beginning, please read the release notes carefully for any
     updates.
