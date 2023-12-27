@@ -9179,6 +9179,10 @@ static const dyesub_pagesize_t dnpds620_page[] =
   DEFINE_PAPER( "w432h576-div2", "4x6*2", PT(1920,300), PT(2498,300), PT(38,300), PT(38,300), 0, 0, DYESUB_PORTRAIT),
   DEFINE_PAPER( "w432h648", "6x9", PT(1920,300), PT(2740,300), PT(38,300), PT(38,300), 0, 0, DYESUB_PORTRAIT),
   DEFINE_PAPER( "w432h648-div2", "4.5x6*2", PT(1920,300), PT(2802,300), PT(38,300), PT(38,300), 0, 0, DYESUB_PORTRAIT),
+  DEFINE_PAPER( "w432h1025", "6x14 Cont Panorama", PT(1920,300), PT(4236,300), PT(38,300), PT(38,300), 0, 0, DYESUB_PORTRAIT),
+  DEFINE_PAPER( "w432h1466", "6x20 Cont Panorama", PT(1920,300), PT(6036,300), PT(38,300), PT(38,300), 0, 0, DYESUB_PORTRAIT),
+  DEFINE_PAPER( "w432h1169", "6x16 Discrete Panorama", PT(1920,300), PT(4872,300), PT(38,300), PT(38,300), 0, 0, DYESUB_PORTRAIT),
+  DEFINE_PAPER( "w432h1754", "6x24 Discrete Panorama", PT(1920,300), PT(7308,300), PT(38,300), PT(38,300), 0, 0, DYESUB_PORTRAIT),
 };
 
 LIST(dyesub_pagesize_list_t, dnpds620_page_list, dyesub_pagesize_t, dnpds620_page);
@@ -9223,6 +9227,14 @@ static const dyesub_printsize_t dnpds620_printsize[] =
   { "300x600", "w432h648", 1920, 5480},
   { "300x300", "w432h648-div2", 1920, 2802},
   { "300x600", "w432h648-div2", 1920, 5604},
+  { "300x300", "w432h1025", 1920, 4236},
+  { "300x600", "w432h1025", 1920, 8472},
+  { "300x300", "w432h1466", 1920, 6036},
+  { "300x600", "w432h1466", 1920, 12072},
+  { "300x300", "w432h1169", 1920, 4872},
+  { "300x600", "w432h1169", 1920, 9744},
+  { "300x300", "w432h1754", 1920, 7308},
+  { "300x600", "w432h1754", 1920, 14616},
 };
 
 LIST(dyesub_printsize_list_t, dnpds620_printsize_list, dyesub_printsize_t, dnpds620_printsize);
@@ -9289,8 +9301,16 @@ static void dnpds620_printer_start(stp_vars_t *v)
     multicut = 5;
   } else if (!strcmp(pd->pagesize, "w432h648-div2")) {
     multicut = 31;
+  } else if (!strcmp(pd->pagesize, "w432h1025")) {
+    multicut = 9000;
+  } else if (!strcmp(pd->pagesize, "w432h1466")) {
+    multicut = 9001;
+  } else if (!strcmp(pd->pagesize, "w432h1169")) {
+    multicut = 9020;
+  } else if (!strcmp(pd->pagesize, "w432h1754")) {
+    multicut = 9021;
   }
-  stp_zprintf(v, "\033PIMAGE MULTICUT        00000008000000%02d", multicut);
+  stp_zprintf(v, "\033PIMAGE MULTICUT        000000080000%04d", multicut);
 }
 
 /* Dai Nippon Printing DS820 */
@@ -9325,6 +9345,23 @@ static const dyesub_pagesize_t dnpds820_page[] =
   DEFINE_PAPER( "A4x10inch-div2", "A4x5inch*2", PT(2560,300), PT(3102,300), PT(16,300), PT(16,300), 0, 0, DYESUB_PORTRAIT),
   DEFINE_PAPER( "A4", "A4", PT(2560,300), PT(3544,300), PT(16,300), PT(16,300), 0, 0, DYESUB_PORTRAIT),
   DEFINE_PAPER( "A4-div2", "A5*2", PT(2560,300), PT(3598,300), PT(16,300), PT(16,300), 0, 0, DYESUB_PORTRAIT),
+  /* Panorama sizes */
+  DEFINE_PAPER( "w576h1305", "8x18 Cont Panorama", PT(2560,300), PT(5436,300), PT(56,300), PT(56,300), 0, 0, DYESUB_PORTRAIT),
+  DEFINE_PAPER( "w576h1881", "8x26 Cont Panorama", PT(2560,300), PT(7836,300), PT(56,300), PT(56,300), 0, 0, DYESUB_PORTRAIT),
+  DEFINE_PAPER( "w576h1593", "8x22 Cont Panorama", PT(2560,300), PT(6636,300), PT(56,300), PT(56,300), 0, 0, DYESUB_PORTRAIT),
+  DEFINE_PAPER( "w576h2312", "8x32 Cont Panorama", PT(2560,300), PT(9636,300), PT(56,300), PT(56,300), 0, 0, DYESUB_PORTRAIT),
+
+  DEFINE_PAPER( "w576h1440", "8x20 Discrete Panorama", PT(2560,300), PT(6072,300), PT(56,300), PT(56,300), 0, 0, DYESUB_PORTRAIT),
+  DEFINE_PAPER( "w576h2160", "8x30 Discrete Panorama", PT(2560,300), PT(9108,300), PT(56,300), PT(56,300), 0, 0, DYESUB_PORTRAIT),
+  DEFINE_PAPER( "w576h1728", "8x24 Discrete Panorama", PT(2560,300), PT(7272,300), PT(56,300), PT(56,300), 0, 0, DYESUB_PORTRAIT),
+  DEFINE_PAPER( "w576h2592", "8x36 Discrete Panorama", PT(2560,300), PT(10908,300), PT(56,300), PT(56,300), 0, 0, DYESUB_PORTRAIT),
+
+//  DEFINE_PAPER( "A4x2C", "A4*2 Cont Panorama", PT(2560,300), PT(6452,300), PT(16,300), PT(16,300), 0, 0, DYESUB_PORTRAIT),
+//  DEFINE_PAPER( "A4x3C", "A4*3 Cont Panorama", PT(2560,300), PT(9360,300), PT(16,300), PT(16,300), 0, 0, DYESUB_PORTRAIT),
+  DEFINE_PAPER( "A4x2", "A4*2 Discrete Panorama", PT(2560,300), PT(7088,300), PT(16,300), PT(16,300), 0, 0, DYESUB_PORTRAIT),
+  DEFINE_PAPER( "A4x3", "A4*3 Discrete Panorama", PT(2560,300), PT(10632,300), PT(16,300), PT(16,300), 0, 0, DYESUB_PORTRAIT),
+
+  /* Note: Continuous panoramas ONLY work with 8x12/8x10 media and sizes! */
 };
 
 LIST(dyesub_pagesize_list_t, dnpds820_page_list, dyesub_pagesize_t, dnpds820_page);
@@ -9383,6 +9420,34 @@ static const dyesub_printsize_t dnpds820_printsize[] =
   { "300x600", "A4", 2560, 7088},
   { "300x300", "A4-div2", 2560, 3598},
   { "300x600", "A4-div2", 2560, 7196},
+  /* Panorama sizes */
+
+  { "300x300", "w576h1305", 2560, 5436},
+  { "300x600", "w576h1305", 2560, 10872},
+  { "300x300", "w576h1881", 2560, 7836},
+  { "300x600", "w576h1881", 2560, 15672},
+  { "300x300", "w576h1593", 2560, 6636},
+  { "300x600", "w576h1593", 2560, 13272},
+  { "300x300", "w576h2312", 2560, 9636},
+  { "300x600", "w576h2312", 2560, 19272},
+
+  { "300x300", "w576h1440", 2560, 6072},
+  { "300x600", "w576h1440", 2560, 12144},
+  { "300x300", "w576h2160", 2560, 9108},
+  { "300x600", "w576h2160", 2560, 18216},
+  { "300x300", "w576h1728", 2560, 7272},
+  { "300x600", "w576h1728", 2560, 14544},
+  { "300x300", "w576h2592", 2560, 10908},
+  { "300x600", "w576h2592", 2560, 21816},
+
+//  { "300x300", "A4x2C", 2560, 6452},
+//  { "300x600", "A4x2C", 2560, 12904},
+//  { "300x300", "A4x3C", 2560, 9360},
+//  { "300x600", "A4x3C", 2560, 18720},
+  { "300x300", "A4x2", 2560, 7088},
+  { "300x600", "A4x2", 2560, 14176},
+  { "300x300", "A4x3", 2560, 10632},
+  { "300x600", "A4x3", 2560, 21264},
 };
 
 LIST(dyesub_printsize_list_t, dnpds820_printsize_list, dyesub_printsize_t, dnpds820_printsize);
@@ -9393,68 +9458,91 @@ static void dnpds820_printer_start(stp_vars_t *v)
 
   int trim = 0; /* XXX add another parameter to control this.  0 or 12-22 for intermediate scrap */
   int cut1 = 0, cut2 = 0, cut3 = 0, cut4 = 0, cut5 = 0, cut6 = 0;
+  int mcut = 0;
 
   /* Common code */
   dnp_printer_start_common(v);
 
   /* Configure multi-cut/page size */
-  stp_zprintf(v, "\033PIMAGE MULTICUT        00000008000000");
-
   if (!strcmp(pd->pagesize, "c8x10")) {
-    stp_zprintf(v, "06");
+    mcut = 6;
   } else if (!strcmp(pd->pagesize, "w576h864")) {
-    stp_zprintf(v, "07");
+    mcut = 7;
   } else if (!strcmp(pd->pagesize, "w288h576")) {
-    stp_zprintf(v, "08");
+    mcut = 8;
   } else if (!strcmp(pd->pagesize, "w360h576")) {
-    stp_zprintf(v, "09");
+    mcut = 9;
   } else if (!strcmp(pd->pagesize, "w432h576")) {
-    stp_zprintf(v, "10");
+    mcut = 10;
   } else if (!strcmp(pd->pagesize, "w576h576")) {
-    stp_zprintf(v, "11");
+    mcut = 11;
   } else if (!strcmp(pd->pagesize, "w576h576-div2")) {
-    stp_zprintf(v, "13");
+    mcut = 13;
   } else if (!strcmp(pd->pagesize, "c8x10-div2")) {
-    stp_zprintf(v, "14");
+    mcut = 14;
   } else if (!strcmp(pd->pagesize, "w576h864-div2")) {
-    stp_zprintf(v, "15");
+    mcut = 15;
   } else if (!strcmp(pd->pagesize, "w576h648-w576h360_w576h288")) {
-    stp_zprintf(v, "16");
+    mcut = 16;
   } else if (!strcmp(pd->pagesize, "c8x10-w576h432_w576h288")) {
-    stp_zprintf(v, "17");
+    mcut = 17;
   } else if (!strcmp(pd->pagesize, "w576h792-w576h432_w576h360")) {
-    stp_zprintf(v, "18");
+    mcut = 18;
   } else if (!strcmp(pd->pagesize, "w576h864-w576h576_w576h288")) {
-    stp_zprintf(v, "19");
+    mcut = 19;
   } else if (!strcmp(pd->pagesize, "w576h864-div3")) {
-    stp_zprintf(v, "20");
+    mcut = 20;
   } else if (!strcmp(pd->pagesize, "w576h842")) {
-    stp_zprintf(v, "21");
+    mcut = 21;
   } else if (!strcmp(pd->pagesize, "w504h576")) {
-    stp_zprintf(v, "32");
+    mcut = 32;
   } else if (!strcmp(pd->pagesize, "w576h648")) {
-    stp_zprintf(v, "33");
+    mcut = 33;
   } else if (!strcmp(pd->pagesize, "A5")) {
-    stp_zprintf(v, "34");
+    mcut = 34;
   } else if (!strcmp(pd->pagesize, "A4x4inch")) {
-    stp_zprintf(v, "36");
+    mcut = 36;
   } else if (!strcmp(pd->pagesize, "A4x5inch")) {
-    stp_zprintf(v, "37");
+    mcut = 37;
   } else if (!strcmp(pd->pagesize, "A4x6inch")) {
-    stp_zprintf(v, "38");
+    mcut = 38;
   } else if (!strcmp(pd->pagesize, "A4x8inch")) {
-    stp_zprintf(v, "39");
+    mcut = 39;
   } else if (!strcmp(pd->pagesize, "A4x10inch")) {
-    stp_zprintf(v, "40");
+    mcut = 40;
   } else if (!strcmp(pd->pagesize, "A4x10inch-div2")) {
-    stp_zprintf(v, "43");
+    mcut = 43;
   } else if (!strcmp(pd->pagesize, "A4")) {
-    stp_zprintf(v, "41");
+    mcut = 41;
   } else if (!strcmp(pd->pagesize, "A4-div2")) {
-    stp_zprintf(v, "35");
-  } else {
-    stp_zprintf(v, "00"); /* should not be possible */
+    mcut = 35;
+  } else if (!strcmp(pd->pagesize, "w576h1305")) {
+    mcut = 9010;
+  } else if (!strcmp(pd->pagesize, "w576h1881")) {
+    mcut = 9011;
+  } else if (!strcmp(pd->pagesize, "w576h1593")) {
+    mcut = 9012;
+  } else if (!strcmp(pd->pagesize, "w576h2312")) {
+    mcut = 9013;
+  } else if (!strcmp(pd->pagesize, "w576h1440")) {
+    mcut = 9030;
+  } else if (!strcmp(pd->pagesize, "w576h2160")) {
+    mcut = 9031;
+  } else if (!strcmp(pd->pagesize, "w576h1728")) {
+    mcut = 9032;
+  } else if (!strcmp(pd->pagesize, "w576h2592")) {
+    mcut = 9033;
+//  } else if (!strcmp(pd->pagesize, "A4x2C")) {
+//    mcut = 9014;
+//  } else if (!strcmp(pd->pagesize, "A4x3C")) {
+//    mcut = 9015;
+  } else if (!strcmp(pd->pagesize, "A4x2")) {
+    mcut = 9034;
+  } else if (!strcmp(pd->pagesize, "A4x3")) {
+    mcut = 9035;
   }
+
+  stp_zprintf(v, "\033PIMAGE MULTICUT        000000080000%04u", mcut);
 
   /* Cutter control */
   if (cut1) {
