@@ -8730,7 +8730,7 @@ static void dnpds40_printer_end(stp_vars_t *v)
 static void dnpds40_plane_init(stp_vars_t *v)
 {
   dyesub_privdata_t *pd = get_privdata(v);
-
+  int i;
   char p = (pd->plane == 3 ? 'Y' :
 	    (pd->plane == 2 ? 'M' :
 	     'C' ));
@@ -8765,7 +8765,9 @@ static void dnpds40_plane_init(stp_vars_t *v)
     stp_put32_le(11808, v); /* vertical pixels per meter @ 300dpi */
   stp_put32_le(256, v);    /* entries in color table  */
   stp_put32_le(0, v);      /* no important colors */
-  dyesub_nputc(v, '\0', 1024);    /* RGB Array, unused by printer */
+  for (i = 255 ; i >= 0; i--) {
+    stp_zprintf(v, "%c%c%c%c", i, i, i, 0);  /* RGB array, 256 * 4 byte entries */
+  }
   dyesub_nputc(v, '\0', PadSize); /* Pading to align plane data */
 }
 
