@@ -2152,7 +2152,7 @@ static int hiti_read_parse(void *vctx, const void **vjob, int data_fd, int copie
 			uint8_t destrgb[3];
 
 			if (corrdata) {
-				hiti_interp33_256(oldrgb, destrgb, corrdata);
+				hiti_interp33_256(destrgb, oldrgb, corrdata);
 			}
 
 			for (j = 0 ; j < job->hdr.cols ; j++) {
@@ -3218,7 +3218,7 @@ static const char *hiti_prefixes[] = {
 
 const struct dyesub_backend hiti_backend = {
 	.name = "HiTi Photo Printers",
-	.version = "0.68",
+	.version = "0.68.1",
 	.uri_prefixes = hiti_prefixes,
 	.cmdline_usage = hiti_cmdline,
 	.cmdline_arg = hiti_cmdline_arg,
