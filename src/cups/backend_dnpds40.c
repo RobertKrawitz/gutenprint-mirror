@@ -1567,11 +1567,15 @@ static int dnpds40_attach(void *vctx, struct dyesub_connection *conn, uint8_t jo
 			ctx->supports_advmatte = 1;
 			ctx->supports_luster = 1;
 			ctx->supports_rewind = 1;
+			ctx->supports_pano = 1;     // XXX what version?
 
-			if (FW_VER_CHECK(1,01))
+			if (FW_VER_CHECK(1,01)) {
 				ctx->supports_finematte = 1;
+				ctx->supports_contpano = 1; // XXX what version?
+			}
 			if (FW_VER_CHECK(1,10))
 				ctx->supports_6x9 = ctx->supports_6x4_5 = 1;
+
 		} else if (ctx->mfg == MFG_DNP) {
 			if (strchr(ctx->version, 'A'))
 				ctx->supports_rewind = 0;
@@ -4030,6 +4034,23 @@ static int dnpds40_set_counter_p(struct dnpds40_ctx *ctx, const char *arg)
 	return CUPS_BACKEND_OK;
 }
 
+static int dnpds40_write_serial(struct dnpds40_ctx *ctx, const char *arg)
+{
+	struct dnpds40_cmd cmd;
+	char buf[32];
+	int ret;
+	memset(buf, ' ', sizeof(buf));
+	memcpy(buf, arg, strnlen(arg, 32));
+	dnpds40_build_cmd(&cmd, "MNT_WT", "PRINTER_ID_SET", sizeof(buf));
+	if ((ret = dnpds40_do_cmd(ctx, &cmd, (uint8_t*)buf, sizeof(buf)))) {
+		ERROR("Serial number write failed!");
+		return -1;
+	}
+	INFO("Serial number updated!\n");
+
+	return CUPS_BACKEND_OK;
+}
+
 static int dnpds40_erase_cwd(struct dnpds40_ctx *ctx)
 {
 	struct dnpds40_cmd cmd;
@@ -4316,6 +4337,7 @@ static void dnpds40_cmdline(void)
 	DEBUG("\t\t[ -x num ]       # Set USB iSerialNumber Reporting (1 on, 0 off)\n");
 	DEBUG("\t\t[ -X ]           # Cancel current print job\n");
 #if 0
+	DEBUG("\t\t[ -S serno ]     # Overwrite serial number (DANGEROUS!!!)\n");
 	DEBUG("\t\t[ -E ]           # Erase CWD data (DANGEROUS!!!)\n");
 	DEBUG("\t\t[ -C filename ]  # Write CWD data (DANGEROUS!!!)\n");
 	DEBUG("\t\t[ -g filename ]  # Write Gamma Table (DANGEROUS!!!)\n");
@@ -4332,7 +4354,7 @@ static int dnpds40_cmdline_arg(void *vctx, int argc, char **argv)
 	if (!ctx)
 		return -1;
 
-	while ((i = getopt(argc, argv, GETOPT_LIST_GLOBAL "iIk:K:nN:p:Rsx:XEC:F:g:H:")) >= 0) {
+	while ((i = getopt(argc, argv, GETOPT_LIST_GLOBAL "iIk:K:nN:p:Rsx:XEC:F:g:H:S:")) >= 0) {
 		switch(i) {
 		GETOPT_PROCESS_GLOBAL
 		case 'i':
@@ -4417,6 +4439,10 @@ static int dnpds40_cmdline_arg(void *vctx, int argc, char **argv)
 		}
 		case 'X': {
 			j = dnpds40_cancel_job(ctx);
+			break;
+		}
+		case 'S': {
+			j = dnpds40_write_serial(ctx, optarg);
 			break;
 		}
 		case 'E': {
@@ -4588,7 +4614,7 @@ static const char *dnpds40_prefixes[] = {
 
 const struct dyesub_backend dnpds40_backend = {
 	.name = "DNP DS-series / Citizen C-series",
-	.version = "0.154",
+	.version = "0.155",
 	.uri_prefixes = dnpds40_prefixes,
 	.cmdline_usage = dnpds40_cmdline,
 	.cmdline_arg = dnpds40_cmdline_arg,
@@ -4621,6 +4647,7 @@ const struct dyesub_backend dnpds40_backend = {
 		{ 0x1343, 0x0006, P_CITIZEN_OP900II, NULL, "citizen-cw-02"},
 		{ 0x1343, 0x0006, P_CITIZEN_OP900II, NULL, "citizen-op900ii"}, /* Duplicate */
 		{ 0x1343, 0x000a, P_DNP_DS620, NULL, "citizen-cx-02"},
+//		{ 0x1343, 0xXXXX, P_DNP_DS620, NULL, "citizen-cx-02s"},
 		{ 0x1343, 0x000b, P_DNP_DS820, NULL, "citizen-cx-02w"},
 		{ 0x1343, 0x000c, P_DNP_QW410, NULL, "citizen-cz-01"},
 //		{ 0x04cb, 0xXXXX, P_DNP_DS620, NULL, "fujifilm-ask-400"},
