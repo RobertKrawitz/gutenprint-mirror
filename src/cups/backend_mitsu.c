@@ -350,6 +350,17 @@ const char *mitsu_media_types(int printer, uint8_t brand, uint8_t type)
 			return "DNP 6x8";
 		else if (type == 0x90)
 			return "DNP 4x8";
+	} else { /* Default fallback */
+		if ((type & 0xf) == 0x01)
+			return "Unknown (3.5x5)";
+		else if ((type & 0xf) == 0x02)
+			return "Unknown (4x6)";
+		else if ((type & 0xf) == 0x04)
+			return "Unknown (5x7)";
+		else if ((type & 0xf) == 0x05)
+			return "Unknown (6x9)";
+		else if ((type & 0xf) == 0x0f)
+			return "Unknown (6x8)";
 	}
 
 	return "Unknown";
