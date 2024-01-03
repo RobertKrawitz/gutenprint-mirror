@@ -325,7 +325,8 @@ const char *mitsu_media_types(int printer, uint8_t brand, uint8_t type)
 			return "Kodak 5R (5x7)";
 		else if (type == 0x8f)
 			return "Kodak 6R (6x8)";
-	} else if (brand == 0x7a) { /* Fujifilm*/
+	} else if (brand == 0x7a ||
+		   brand == 0xda) { /* Fujifilm*/
 		if (type == 0x01)
 			return "RL-CF900 (3.5x5)";
 		else if (type == 0x02)
