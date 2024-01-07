@@ -7102,8 +7102,8 @@ static void mitsu_cpdneo_printer_init(stp_vars_t *v, int m1)
     stp_put16_be(2, v);
     dyesub_nputc(v, 0x00, 14);
   } else {
-    if (strcmp(pd->pagesize,"w432h648-1008") == 0 ||
-        strcmp(pd->pagesize,"w432h648-1440") == 0) {
+    if (strcmp(pd->pagesize,"w432h1008") == 0 ||
+        strcmp(pd->pagesize,"w432h1440") == 0) {
       stp_putc(0x01, v);  /* Backend needs to process a this */
       stp_put16_be(3, v);  /* It's a panorama, yo! */
     } else {
