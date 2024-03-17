@@ -1,7 +1,7 @@
 /*
- *   Mitsubishi CP-D70/D707 Photo Printer CUPS backend -- libusb-1.0 version
+ *   Mitsubishi CP-D70/D707 Photo Printer CUPS backend
  *
- *   (c) 2013-2023 Solomon Peachy <pizza@shaftnet.org>
+ *   (c) 2013-2024 Solomon Peachy <pizza@shaftnet.org>
  *
  *   The latest version of this program can be found at:
  *
@@ -339,7 +339,7 @@ static int mitsu70x_main_loop(void *vctx, const void *vjob, int wait_for_return)
 
 /* Error dumps, etc */
 
-static const char *mitsu70x_mechastatus(uint8_t *sts)
+static const char *mitsu70x_mechastatus(const uint8_t *sts)
 {
 	switch(sts[0]) {
 	case MECHA_STATUS_INIT:
@@ -359,7 +359,7 @@ static const char *mitsu70x_mechastatus(uint8_t *sts)
 	return "Unknown Mechanical Status";
 }
 
-static const char *mitsu70x_jobstatuses(uint8_t *sts)
+static const char *mitsu70x_jobstatuses(const uint8_t *sts)
 {
 	switch(sts[0]) {
 	case JOB_STATUS0_NONE:
@@ -446,7 +446,7 @@ static const char *mitsu70x_jobstatuses(uint8_t *sts)
 	return "Unknown status0";
 }
 
-static const char *mitsu70x_errorclass(uint8_t *err)
+static const char *mitsu70x_errorclass(const uint8_t *err)
 {
 	switch(err[1]) {
 	case ERROR_STATUS1_PAPER:
@@ -477,7 +477,7 @@ static const char *mitsu70x_errorclass(uint8_t *err)
 	return "Unknown error class";
 }
 
-static const char *mitsu70x_errorrecovery(uint8_t *err)
+static const char *mitsu70x_errorrecovery(const uint8_t *err)
 {
 	switch(err[1]) {
 	case ERROR_STATUS2_AUTO:
@@ -508,7 +508,7 @@ static const char *mitsu70x_errorrecovery(uint8_t *err)
 	return "Unknown recovery";
 }
 
-static const char *mitsu70x_errors(uint8_t *err)
+static const char *mitsu70x_errors(const uint8_t *err)
 {
 	switch(err[0]) {
 	case ERROR_STATUS0_NOSTRIPBIN:
@@ -619,7 +619,7 @@ static int mitsu70x_attach(void *vctx, struct dyesub_connection *conn, uint8_t j
 	} else {
 		int media_code = 0xf;
 		if (getenv("MEDIA_CODE"))
-			media_code = atoi(getenv("MEDIA_CODE")) & 0xf;
+			media_code = strtol(getenv("MEDIA_CODE"), NULL, 16) & 0xf;
 
 		resp.upper.mecha_status[0] = MECHA_STATUS_INIT;
 		resp.lower.mecha_status[0] = MECHA_STATUS_INIT;
@@ -747,7 +747,7 @@ static void *mitsu70x_combine_jobs(const void *vjob1,
 	struct mitsu70x_printjob *newjob = NULL;
 	uint16_t newrows;
 	uint16_t newcols;
-	uint32_t newpad, finalpad;
+	int32_t middlepad, finalpad;
 	uint16_t lamoffset;
 
 	const struct mitsu70x_hdr *hdr1, *hdr2;
@@ -764,10 +764,9 @@ static void *mitsu70x_combine_jobs(const void *vjob1,
 	JOB_EQUIV(cols);
 	JOB_EQUIV(matte);
 	JOB_EQUIV(sharpen);
+	JOB_EQUIV(raw_format);
 
 	if (hdr1->multicut || hdr2->multicut) // XXX type 5 (2x6*2) -> type4 (2x6*4), 6x9 needed, 2628 rows. use '4' in multicut field.
-		goto done;
-	if (job1->raw_format || job2->raw_format)
 		goto done;
 	if (hdr1->speed != hdr2->speed)
 		goto done;
@@ -775,26 +774,25 @@ static void *mitsu70x_combine_jobs(const void *vjob1,
 	switch (job1->rows) {
 	case 1218:  /* K60, EK305 */
 		newrows = 2454;
-		newpad = 16;
+		middlepad = 18;
 		finalpad = 0;
 		lamoffset = 0;
 		break;
 	case 1228:  /* D70, ASK300, D80, DS480/DS680 */
 		if (job1->cols == 1264) { // DS480 4" wide..
 			newrows = 2494;
-			newpad = 38;
+			middlepad = 38;
 			finalpad = 0;
-			lamoffset = 12;
 		} else {
 			newrows = 2730;
-			newpad = 38;
+			middlepad = 38;
 			finalpad = 236;
-			lamoffset = 12;
 		}
+		lamoffset = 12;
 		break;
 	case 1076: /* EK305, K60 3.5x5" prints */
 		newrows = 2190;
-		newpad = 49;
+		middlepad = 38;
 		finalpad = 0;
 		lamoffset = 0;
 		break;
@@ -802,7 +800,7 @@ static void *mitsu70x_combine_jobs(const void *vjob1,
 		goto done;
 	}
 	newcols = job1->cols;
-	newpad *= newcols;
+	middlepad *= newcols;
 	finalpad *= newcols;
 
 	/* Okay, it's kosher to proceed */
@@ -856,20 +854,21 @@ static void *mitsu70x_combine_jobs(const void *vjob1,
                 goto done;
 	}
 
-	/* Fill in padding */
+	/* Fill in "final" padding */
 	memset(newjob->spoolbuf + newjob->spoolbuflen, 0xff, finalpad * 3);
 	newjob->spoolbuflen += finalpad * 3;
 
-	/* Copy image payload */
+	/* Copy image1 payload */
 	memcpy(newjob->spoolbuf + newjob->spoolbuflen, job1->spoolbuf,
 	       job1->spoolbuflen);
 	newjob->spoolbuflen += job1->spoolbuflen;
 
-	/* Fill in padding */
-	memset(newjob->spoolbuf + newjob->spoolbuflen, 0xff, newpad * 3);
-	newjob->spoolbuflen += newpad * 3;
+	/* Fill in middle padding */
+	if (middlepad > 0)
+		memset(newjob->spoolbuf + newjob->spoolbuflen, 0xff, middlepad * 3);
+	newjob->spoolbuflen += middlepad * 3;
 
-	/* Copy image payload */
+	/* Copy image2 payload */
 	memcpy(newjob->spoolbuf + newjob->spoolbuflen, job2->spoolbuf,
 	       job2->spoolbuflen);
 	newjob->spoolbuflen += job2->spoolbuflen;
@@ -1552,7 +1551,7 @@ static int mitsu70x_test_dump(struct mitsu70x_ctx *ctx)
 
 	/* response is struct mitsu70x_calinfo_resp */
 	{
-		struct mitsu70x_calinfo_resp *calinfo = (struct mitsu70x_calinfo_resp*) resp;
+		const struct mitsu70x_calinfo_resp *calinfo = (struct mitsu70x_calinfo_resp*) resp;
 		char buf[5];
 		float f;
 
@@ -1871,6 +1870,7 @@ static int mitsu70x_main_loop(void *vctx, const void *vjob, int wait_for_return)
 		ret = be16_to_cpu(hdr->lamcols) * be16_to_cpu(hdr->lamrows) * 2;
 		memset(job->databuf + job->datalen, 0, job->matte - ret);
 	}
+	job->raw_format = 1;
 
 bypass:
 	/* Bypass */
@@ -2076,29 +2076,13 @@ top:
 			     sizeof(struct mitsu70x_hdr))))
 		return CUPS_BACKEND_FAILED;
 
-	if (ctx->lib.dl_handle && !job->raw_format) {
-		if (ctx->lib.SendImageData(&ctx->output, ctx, d70_library_callback))
+	/* Library handles sending data -- in REVERSE row order! */
+	if (ctx->lib.SendImageData(&ctx->output, ctx, d70_library_callback))
+		return CUPS_BACKEND_FAILED;
+
+	if (job->matte)
+		if (d70_library_callback(ctx, job->databuf + job->datalen - job->matte, job->matte))
 			return CUPS_BACKEND_FAILED;
-
-		if (job->matte)
-			if (d70_library_callback(ctx, job->databuf + job->datalen - job->matte, job->matte))
-			    return CUPS_BACKEND_FAILED;
-	} else { // Fallback code..
-               /* K60 and 305 need data sent in 256K chunks, but the first
-                  chunk needs to subtract the length of the 512-byte header */
-
-		int chunk = CHUNK_LEN - sizeof(struct mitsu70x_hdr);
-		int sent = 512;
-		while (chunk > 0) {
-			if ((ret = send_data(ctx->conn,
-					     job->databuf + sent, chunk)))
-				return CUPS_BACKEND_FAILED;
-			sent += chunk;
-			chunk = job->datalen - sent;
-			if (chunk > CHUNK_LEN)
-				chunk = CHUNK_LEN;
-		}
-       }
 
 	/* Then wait for completion, if so desired.. */
 	INFO("Waiting for printer to acknowledge completion\n");
@@ -2619,7 +2603,7 @@ static const char *mitsu70x_prefixes[] = {
 /* Exported */
 const struct dyesub_backend mitsu70x_backend = {
 	.name = "Mitsubishi CP-D70 family",
-	.version = "0.108" " (lib " LIBMITSU_VER ")",
+	.version = "0.111" " (lib " LIBMITSU_VER ")",
 	.flags = BACKEND_FLAG_DUMMYPRINT,
 	.uri_prefixes = mitsu70x_prefixes,
 	.cmdline_usage = mitsu70x_cmdline,
