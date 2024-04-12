@@ -671,81 +671,17 @@ GUTENPRINT_BASE_VERSION=${GUTENPRINT_MAJOR_VERSION}.${GUTENPRINT_MINOR_VERSION}.
 AH_TEMPLATE(GUTENPRINT_BASE_VERSION,, [Gutenprint base version])
 AC_DEFINE_UNQUOTED(GUTENPRINT_BASE_VERSION, "${GUTENPRINT_BASE_VERSION}")
 
-dnl Set PACKAGE_LOCALE_DIR in config.h
-AH_TEMPLATE(PACKAGE_LOCALE_DIR,, [Package locale directory])
-if test "x${prefix}" = "xNONE"; then
-  AC_DEFINE_UNQUOTED(PACKAGE_LOCALE_DIR, ["${ac_default_prefix}/share/locale"])
-else
-  AC_DEFINE_UNQUOTED(PACKAGE_LOCALE_DIR, ["${prefix}/share/locale"])
-fi
+PACKAGE_LOCALE_DIR='${prefix}/share/locale'
 
-dnl Set PACKAGE_DATA_DIR in config.h.
-AH_TEMPLATE(PACKAGE_DATA_DIR,, [Package data directory])
-if test "x${datadir}" = 'x${prefix}/share'; then
-  if test "x${prefix}" = "xNONE"; then
-    PACKAGE_DATA_DIR="${ac_default_prefix}/share/${PACKAGE}"
-  else
-    PACKAGE_DATA_DIR="${prefix}/share/${PACKAGE}"
-  fi
-elif test "x${datadir}" = 'x${datarootdir}'; then
-  if test "x${datarootdir}" = 'x${prefix}/share'; then
-    if test "x${prefix}" = "xNONE"; then
-      PACKAGE_DATA_DIR="${ac_default_prefix}/share/${PACKAGE}"
-    else
-      PACKAGE_DATA_DIR="${prefix}/share/${PACKAGE}"
-    fi
-  else
-    PACKAGE_DATA_DIR="${datarootdir}/${PACKAGE}"
-  fi
-else
-  PACKAGE_DATA_DIR="${datadir}/${PACKAGE}"
-fi
+PACKAGE_DATA_DIR="${datadir}/${PACKAGE}"
 
-AC_DEFINE_UNQUOTED(PACKAGE_DATA_DIR, "${PACKAGE_DATA_DIR}")
+PACKAGE_LIB_DIR="${libdir}/${PACKAGE}"
 
-dnl Set PACKAGE_LIB_DIR in config.h.
-AH_TEMPLATE(PACKAGE_LIB_DIR,, [Package lib directory])
-if test "x${libdir}" = 'x${exec_prefix}/lib'; then
-  if test "x${exec_prefix}" = "xNONE"; then
-    if test "x${prefix}" = "xNONE"; then
-      PACKAGE_LIB_DIR="${ac_default_prefix}/lib/${PACKAGE}"
-    else
-      PACKAGE_LIB_DIR="${prefix}/lib/${PACKAGE}"
-    fi
-  else
-    PACKAGE_LIB_DIR="${exec_prefix}/lib/${PACKAGE}"
-  fi
-else
-  PACKAGE_LIB_DIR="${libdir}/${PACKAGE}"
-fi
+PACKAGE_BIN_DIR="${bindir}"
 
-AC_DEFINE_UNQUOTED(PACKAGE_LIB_DIR, ["${PACKAGE_LIB_DIR}"])
-
-dnl Set PACKAGE_BIN_DIR in config.h.
-AH_TEMPLATE(PACKAGE_BIN_DIR,, [Package bin directory])
-if test "x${bindir}" = 'x${exec_prefix}/bin'; then
-  if test "x${exec_prefix}" = "xNONE"; then
-    if test "x${prefix}" = "xNONE"; then
-      PACKAGE_BIN_DIR="${ac_default_prefix}/bin"
-    else
-      PACKAGE_BIN_DIR="${prefix}/bin"
-    fi
-  else
-    PACKAGE_BIN_DIR="${exec_prefix}/bin"
-  fi
-else
-  PACKAGE_BIN_DIR="${bindir}"
-fi
-
-AC_DEFINE_UNQUOTED(PACKAGE_BIN_DIR, ["${PACKAGE_BIN_DIR}"])
-
-AH_TEMPLATE(PKGXMLDATADIR,, [Package XML data directory])
 PKGXMLDATADIR="${PACKAGE_DATA_DIR}/${GUTENPRINT_RELEASE_VERSION}/xml"
-AC_DEFINE_UNQUOTED(PKGXMLDATADIR, ["$PKGXMLDATADIR"], )
 
-AH_TEMPLATE(PKGMODULEDIR,, [Package module directory])
 PKGMODULEDIR="${PACKAGE_LIB_DIR}/${GUTENPRINT_RELEASE_VERSION}/modules"
-AC_DEFINE_UNQUOTED(PKGMODULEDIR, ["$PKGMODULEDIR"])
 
 dnl Compiler flags
 if test x$ac_compiler_gnu = "xyes"; then
@@ -1064,8 +1000,12 @@ RM='rm'
 PKGROOT=`pwd`
 
 dnl Substitutions
-AC_SUBST(prefix)
-AC_SUBST(exec_prefix)
+AC_SUBST(PACKAGE_LOCALE_DIR)
+AC_SUBST(PACKAGE_DATA_DIR)
+AC_SUBST(PACKAGE_LIB_DIR)
+AC_SUBST(PACKAGE_BIN_DIR)
+AC_SUBST(PKGXMLDATADIR)
+AC_SUBST(PKGMODULEDIR)
 AC_SUBST(cups_prefix)
 AC_SUBST(cups_exec_prefix)
 AC_SUBST(cups_bindir)
@@ -1255,10 +1195,10 @@ echo "    Installation prefix:                        $prefix" |tee -a config.su
 # Configure intentionally does not expand exec_prefix to allow make
 # to do so.
 echo "    Exec prefix:                                `eval eval echo $exec_prefix` ($exec_prefix)" |tee -a config.summary
-echo "    Data directory:                             $PACKAGE_DATA_DIR" |tee -a config.summary
+echo "    Data directory:                             `eval eval echo $PACKAGE_DATA_DIR` ($PACKAGE_DATA_DIR)" |tee -a config.summary
 echo "    Library directory:                          `eval eval echo $PACKAGE_LIB_DIR` ($PACKAGE_LIB_DIR)" |tee -a config.summary
 echo "    Executable directory:                       `eval eval echo $PACKAGE_BIN_DIR` ($PACKAGE_BIN_DIR)" |tee -a config.summary
-echo "    XML data directory:                         $PKGXMLDATADIR" |tee -a config.summary
+echo "    XML data directory:                         `eval eval echo $PKGXMLDATADIR` ($PKGXMLDATADIR)" |tee -a config.summary
 echo "    Module directory:                           `eval eval echo $PKGMODULEDIR` ($PKGMODULEDIR)" |tee -a config.summary
 echo "    Install sample images:                      $INSTALL_SAMPLES" |tee -a config.summary
 echo |tee -a config.summary
