@@ -1,15 +1,15 @@
 /*
  *   Mitsubishi Photo Printer Comon Code
  *
- *   (c) 2013-2023 Solomon Peachy <pizza@shaftnet.org>
+ *   (c) 2013-2024 Solomon Peachy <pizza@shaftnet.org>
  *
  *   The latest version of this program can be found at:
  *
- *     https://git.shaftnet.org/cgit/selphy_print.git
+ *     https://git.shaftnet.org/gitea/slp/selphy_print.git
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the Free
- *   Software Foundation; either version 3 of the License, or (at your option)
+ *   Software Foundation; either version 2 of the License, or (at your option)
  *   any later version.
  *
  *   This program is distributed in the hope that it will be useful, but
@@ -20,7 +20,7 @@
  *   You should have received a copy of the GNU General Public License
  *   along with this program; if not, see <https://www.gnu.org/licenses/>.
  *
- *   SPDX-License-Identifier: GPL-3.0+
+ *   SPDX-License-Identifier: GPL-2.0+
  *
  */
 
@@ -60,7 +60,7 @@ typedef void (*DoColorConvFN)(struct CColorConv3D *this, uint8_t *data, uint16_t
 typedef void (*DoColorConvPlaneFN)(struct CColorConv3D *this, uint8_t *data_r, uint8_t *data_g, uint8_t *data_b, uint32_t planelen);
 typedef struct CPCData *(*get_CPCDataFN)(const char *filename);
 typedef void (*destroy_CPCDataFN)(struct CPCData *data);
-typedef int (*do_image_effectFN)(struct CPCData *cpc, struct CPCData *ecpc, struct BandImage *input, struct BandImage *output, int sharpen, int reverse, uint8_t rew[2]);
+typedef int (*do_image_effectFN)(struct CPCData *cpc, struct CPCData *ecpc, struct BandImage *input, struct BandImage *output, int sharpen, int reverse, uint8_t rew[3]);
 typedef int (*send_image_dataFN)(struct BandImage *out, void *context,
 			       int (*callback_fn)(void *context, void *buffer, uint32_t len));
 
@@ -94,7 +94,7 @@ typedef int (*CPD30_DoConvertFN)(const struct mitsu_cpd30_data *table,
 #warning "No dynamic loading support!"
 #endif
 
-#define REQUIRED_LIB_APIVERSION 8
+#define REQUIRED_LIB_APIVERSION 10
 
 #define LIBMITSU_VER "0.12"
 

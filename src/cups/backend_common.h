@@ -1,11 +1,11 @@
 /*
  *   CUPS Backend common code
  *
- *   (c) 2013-2023 Solomon Peachy <pizza@shaftnet.org>
+ *   (c) 2013-2024 Solomon Peachy <pizza@shaftnet.org>
  *
  *   The latest version of this program can be found at:
  *
- *     https://git.shaftnet.org/cgit/selphy_print.git
+ *     https://git.shaftnet.org/gitea/slp/selphy_print.git
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the Free
@@ -56,7 +56,7 @@
 #define DEBUG( ... ) do { if (!quiet) fprintf(logger, "DEBUG: " __VA_ARGS__ ); } while(0)
 #define DEBUG2( ... ) do { if (!quiet) fprintf(logger, __VA_ARGS__ ); } while(0)
 #define INFO( ... )  do { if (!quiet) fprintf(logger, "INFO: " __VA_ARGS__ ); } while(0)
-#define WARNING( ... )  do { fprintf(logger, "WARNING: " __VA_ARGS__ ); } while(0)
+#define WARNING( ... )  do { if (!quiet) fprintf(logger, "WARNING: " __VA_ARGS__ ); } while(0)
 #define ERROR( ... ) do { fprintf(logger, "ERROR: " __VA_ARGS__ ); sleep(1); } while (0)
 #define PPD( ... ) do { fprintf(logger, "PPD: " __VA_ARGS__ ); } while (0)
 
@@ -246,6 +246,19 @@ struct dyesub_job_common {
 	int can_combine;
 };
 
+/* Panorama stuff */
+struct panodata_row {
+        uint16_t start_row;
+        double rhYMC[3];
+        double lhYMC[3];
+};
+
+#define DNP_PANO_MAXROWS 64
+struct dnp_panodata {
+        uint16_t elements;
+        struct panodata_row rows[DNP_PANO_MAXROWS];
+};
+
 /* Exported functions */
 int send_data(struct dyesub_connection *conn, const uint8_t *buf, int len);
 int read_data(struct dyesub_connection *conn,
@@ -283,32 +296,39 @@ int dyesub_joblist_canwait(struct dyesub_joblist *list);
 #define BACKEND_FLAG_BADISERIAL 0x00000001
 #define BACKEND_FLAG_DUMMYPRINT 0x00000002
 
-int dyesub_pano_split_rgb8(const uint8_t *src, uint16_t cols,
-			   uint16_t src_rows, uint8_t numpanels,
-			   uint16_t overlap_rows, uint16_t max_rows,
-			   uint8_t *panels[3],
-			   uint16_t panel_rows[3]);
+void dyesub_pano_split_rgb8(const uint8_t *src, uint16_t cols, uint8_t numpanels,
+			    uint16_t overlap_rows, uint16_t pad_rows,
+			    uint16_t *panel_rows, uint8_t **panels);
 
 /* Backend Functions */
 struct dyesub_backend {
+	/* Required properties */
 	const char *name;
 	const char *version;
 	const char **uri_prefixes;
+	const struct device_id *devices;
+
+	/* Optional properties */
 	const uint32_t flags;
-	void (*cmdline_usage)(void);  /* Optional */
+
+	/* Required functions */
 	void *(*init)(void);
 	int  (*attach)(void *ctx, struct dyesub_connection *conn, uint8_t jobid);
-	void (*teardown)(void *ctx);
 	int  (*cmdline_arg)(void *ctx, int argc, char **argv);
 	int  (*read_parse)(void *ctx, const void **job, int data_fd, int copies);
+	int  (*main_loop)(void *ctx, const void *job, int wait_on_return);
 	void (*cleanup_job)(const void *job);
+
+	/* Required if backend implemnets job combining */
 	void *(*combine_jobs)(const void *job1, const void *job2);
 	int  (*job_polarity)(void *ctx);
-	int  (*main_loop)(void *ctx, const void *job, int wait_on_return);
-	int  (*query_serno)(struct dyesub_connection *conn, char *buf, int buf_len); /* Optional */
+
+	/* Optional stuff */
+	void (*teardown)(void *ctx);
+	void (*cmdline_usage)(void);
+	int  (*query_serno)(struct dyesub_connection *conn, char *buf, int buf_len);
 	int  (*query_markers)(void *ctx, struct marker **markers, int *count);
-	int  (*query_stats)(void *ctx, struct printerstats *stats); /* Optional */
-	const struct device_id devices[];
+	int  (*query_stats)(void *ctx, struct printerstats *stats);
 };
 
 /* Global data */

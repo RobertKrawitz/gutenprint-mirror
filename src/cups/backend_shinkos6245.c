@@ -1,13 +1,13 @@
 /*
- *   Shinko/Sinfonia CHC-S6245 CUPS backend -- libusb-1.0 version
+ *   Shinko/Sinfonia CHC-S6245 CUPS backend
  *
- *   (c) 2015-2021 Solomon Peachy <pizza@shaftnet.org>
+ *   (c) 2015-2024 Solomon Peachy <pizza@shaftnet.org>
  *
  *   Low-level documentation was provided by Sinfonia, Inc.  Thank you!
  *
  *   The latest version of this program can be found at:
  *
- *     https://git.shaftnet.org/cgit/selphy_print.git
+ *     https://git.shaftnet.org/gitea/slp/selphy_print.git
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the Free
@@ -936,7 +936,7 @@ static int shinkos6245_attach(void *vctx, struct dyesub_connection *conn, uint8_
 	} else {
 		int media_code = RIBBON_8x12;
 		if (getenv("MEDIA_CODE"))
-			media_code = atoi(getenv("MEDIA_CODE"));
+			media_code = strtol(getenv("MEDIA_CODE"),NULL,16);
 
 		ctx->media.ribbon_code = media_code;
 	}
@@ -1173,7 +1173,7 @@ static int shinkos6245_main_loop(void *vctx, const void *vjob, int wait_for_retu
 	if (ctx->dev.conn->type != P_KODAK_8810) {
 		struct sinfonia_settime_cmd *settime = (struct sinfonia_settime_cmd *)cmdbuf;
 		time_t now = time(NULL);
-		struct tm *cur = localtime(&now);
+		const struct tm *cur = localtime(&now);
 
 		memset(cmdbuf, 0, CMDBUF_LEN);
 		cmd->cmd = cpu_to_le16(SINFONIA_CMD_SETTIME);
@@ -1465,6 +1465,14 @@ static const char *shinkos6245_prefixes[] = {
 	NULL
 };
 
+static const struct device_id shinkos6245_devices[] = {
+	{ 0x10ce, 0x001d, P_SHINKO_S6245, NULL, "sinfonia-chcs6245"},
+	{ 0x10ce, 0x001d, P_SHINKO_S6245, NULL, "shinko-chcs6245"}, /* Duplicate */
+	{ 0x0d16, 0x000e, P_HITI_910, NULL, "hiti-p910l"}, /* aka CHC-S6245-5B */
+	{ 0x040a, 0x404d, P_KODAK_8810, NULL, "kodak-8810"}, /* aka CHC-S1845-5A */
+	{ 0, 0, 0, NULL, NULL}
+};
+
 const struct dyesub_backend shinkos6245_backend = {
 	.name = "Sinfonia CHC-S6245 / Kodak 8810",
 	.version = "0.43" " (lib " LIBSINFONIA_VER ")",
@@ -1479,13 +1487,7 @@ const struct dyesub_backend shinkos6245_backend = {
 	.query_serno = sinfonia_query_serno,
 	.query_markers = shinkos6245_query_markers,
 	.query_stats = shinkos6245_query_stats,
-	.devices = {
-		{ 0x10ce, 0x001d, P_SHINKO_S6245, NULL, "sinfonia-chcs6245"},
-		{ 0x10ce, 0x001d, P_SHINKO_S6245, NULL, "shinko-chcs6245"}, /* Duplicate */
-		{ 0x0d16, 0x000e, P_HITI_910, NULL, "hiti-p910l"},
-		{ 0x040a, 0x404d, P_KODAK_8810, NULL, "kodak-8810"},
-		{ 0, 0, 0, NULL, NULL}
-	}
+	.devices = shinkos6245_devices,
 };
 
 /* CHC-S6245 data format

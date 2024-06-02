@@ -1,7 +1,7 @@
 /*
  *   Mitsubishi P93D/P95D Monochrome Thermal Photo Printer CUPS backend
  *
- *   (c) 2016-2021 Solomon Peachy <pizza@shaftnet.org>
+ *   (c) 2016-2024 Solomon Peachy <pizza@shaftnet.org>
  *
  *   Development of this backend was sponsored by:
  *
@@ -9,7 +9,7 @@
  *
  *   The latest version of this program can be found at:
  *
- *     https://git.shaftnet.org/cgit/selphy_print.git
+ *     https://git.shaftnet.org/gitea/slp/selphy_print.git
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the Free
@@ -604,11 +604,18 @@ static const char *mitsup95d_prefixes[] = {
 	NULL
 };
 
+static const struct device_id mitsup95d_devices[] = {
+	{ 0x06d3, 0x0398, P_MITSU_P93D, NULL, "mitsubishi-p93d"},
+	{ 0x06d3, 0x3b10, P_MITSU_P95D, NULL, "mitsubishi-p95d"},
+	{ 0, 0, 0, NULL, NULL}
+};
+
 /* Exported */
 const struct dyesub_backend mitsup95d_backend = {
 	.name = "Mitsubishi P93D/P95D",
 	.version = "0.16",
 	.uri_prefixes = mitsup95d_prefixes,
+	.devices = mitsup95d_devices,
 	.cmdline_arg = mitsup95d_cmdline_arg,
 	.cmdline_usage = mitsup95d_cmdline,
 	.init = mitsup95d_init,
@@ -617,11 +624,6 @@ const struct dyesub_backend mitsup95d_backend = {
 	.read_parse = mitsup95d_read_parse,
 	.main_loop = mitsup95d_main_loop,
 	.query_markers = mitsup95d_query_markers,
-	.devices = {
-		{ 0x06d3, 0x0398, P_MITSU_P93D, NULL, "mitsubishi-p93d"},
-		{ 0x06d3, 0x3b10, P_MITSU_P95D, NULL, "mitsubishi-p95d"},
-		{ 0, 0, 0, NULL, NULL}
-	}
 };
 
 /*****************************************************

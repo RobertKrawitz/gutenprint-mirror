@@ -1,13 +1,13 @@
 /*
- *   Shinko/Sinfonia CHC-S1245 CUPS backend -- libusb-1.0 version
+ *   Shinko/Sinfonia CHC-S1245 CUPS backend
  *
- *   (c) 2015-2021 Solomon Peachy <pizza@shaftnet.org>
+ *   (c) 2015-2024 Solomon Peachy <pizza@shaftnet.org>
  *
  *   Low-level documentation was provided by Sinfonia, Inc.  Thank you!
  *
  *   The latest version of this program can be found at:
  *
- *     https://git.shaftnet.org/cgit/selphy_print.git
+ *     https://git.shaftnet.org/gitea/slp/selphy_print.git
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the Free
@@ -257,7 +257,7 @@ static void shinkos1245_fill_hdr(struct shinkos1245_cmd_hdr *hdr)
 }
 
 static int shinkos1245_do_cmd(struct shinkos1245_ctx *ctx,
-			      void *cmd, int cmd_len,
+			      const void *cmd, int cmd_len,
 			      void *resp, int resp_len,
 			      int *actual_len)
 {
@@ -959,7 +959,7 @@ static int shinkos1245_attach(void *vctx, struct dyesub_connection *conn, uint8_
 	} else {
 		int media_code = 1;
 		if (getenv("MEDIA_CODE"))
-			media_code = atoi(getenv("MEDIA_CODE"));
+			media_code = strtol(getenv("MEDIA_CODE"), NULL, 16);
 
 		ctx->media_8x12 = media_code;
 		ctx->num_medias = 0;
@@ -1279,10 +1279,17 @@ static const char *shinkos1245_prefixes[] = {
 	NULL
 };
 
+static const struct device_id shinkos1245_devices[] = {
+	{ 0x10ce, 0x0007, P_SHINKO_S1245, NULL, "shinko-chcs1245"},
+	{ 0x10ce, 0x0007, P_SHINKO_S1245, NULL, "sinfonia-chcs1245"}, /* Duplicate */
+	{ 0, 0, 0, NULL, NULL}
+};
+
 const struct dyesub_backend shinkos1245_backend = {
 	.name = "Shinko/Sinfonia CHC-S1245/E1",
 	.version = "0.35" " (lib " LIBSINFONIA_VER ")",
 	.uri_prefixes = shinkos1245_prefixes,
+	.devices = shinkos1245_devices,
 	.cmdline_usage = shinkos1245_cmdline,
 	.cmdline_arg = shinkos1245_cmdline_arg,
 	.init = shinkos1245_init,
@@ -1293,11 +1300,6 @@ const struct dyesub_backend shinkos1245_backend = {
 	.query_serno = shinkos1245_query_serno,
 	.query_markers = shinkos1245_query_markers,
 	.query_stats = shinkos1245_query_stats,
-	.devices = {
-		{ 0x10ce, 0x0007, P_SHINKO_S1245, NULL, "shinko-chcs1245"},
-		{ 0x10ce, 0x0007, P_SHINKO_S1245, NULL, "sinfonia-chcs1245"}, /* Duplicate */
-		{ 0, 0, 0, NULL, NULL}
-	}
 };
 
 /* CHC-S1245 data format

@@ -1,11 +1,11 @@
 /*
- *   Kodak Professional 1400/805 CUPS backend -- libusb-1.0 version
+ *   Kodak Professional 1400/805 CUPS backend
  *
- *   (c) 2013-2021 Solomon Peachy <pizza@shaftnet.org>
+ *   (c) 2013-2024 Solomon Peachy <pizza@shaftnet.org>
  *
  *   The latest version of this program can be found at:
  *
- *     https://git.shaftnet.org/cgit/selphy_print.git
+ *     https://git.shaftnet.org/gitea/slp/selphy_print.git
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the Free
@@ -635,10 +635,22 @@ static const char *kodak1400_prefixes[] = {
 	NULL,
 };
 
+static const struct device_id kodak1400_devices[] = {
+	{ 0x040a, 0x4022, P_KODAK_1400_805, "Kodak", "kodak-1400"},
+	{ 0x040a, 0x4034, P_KODAK_1400_805, "Kodak", "kodak-805"},
+	{ 0x06d3, 0x038b, P_KODAK_1400_805, NULL, "mitsubishi-3020d"},
+	{ 0x06d3, 0x038b, P_KODAK_1400_805, NULL, "mitsubishi-3020du"}, /* Duplicate */
+	{ 0x06d3, 0x038b, P_KODAK_1400_805, NULL, "mitsubishi-3020de"}, /* Duplicate */
+	{ 0x06d3, 0x03aa, P_KODAK_1400_805, NULL, "mitsubishi-3020da" },
+	{ 0x06d3, 0x03aa, P_KODAK_1400_805, NULL, "mitsubishi-3020dae" }, /* Duplicate */
+	{ 0, 0, 0, NULL, NULL}
+};
+
 const struct dyesub_backend kodak1400_backend = {
 	.name = "Kodak 1400/805",
 	.version = "0.44",
 	.uri_prefixes = kodak1400_prefixes,
+	.devices = kodak1400_devices,
 	.cmdline_usage = kodak1400_cmdline,
 	.cmdline_arg = kodak1400_cmdline_arg,
 	.init = kodak1400_init,
@@ -647,16 +659,6 @@ const struct dyesub_backend kodak1400_backend = {
 	.read_parse = kodak1400_read_parse,
 	.main_loop = kodak1400_main_loop,
 	.query_markers = kodak1400_query_markers,
-	.devices = {
-		{ 0x040a, 0x4022, P_KODAK_1400_805, "Kodak", "kodak-1400"},
-		{ 0x040a, 0x4034, P_KODAK_1400_805, "Kodak", "kodak-805"},
-		{ 0x06d3, 0x038b, P_KODAK_1400_805, NULL, "mitsubishi-3020d"},
-		{ 0x06d3, 0x038b, P_KODAK_1400_805, NULL, "mitsubishi-3020du"}, /* Duplicate */
-		{ 0x06d3, 0x038b, P_KODAK_1400_805, NULL, "mitsubishi-3020de"}, /* Duplicate */
-		{ 0x06d3, 0x03aa, P_KODAK_1400_805, NULL, "mitsubishi-3020da" },
-		{ 0x06d3, 0x03aa, P_KODAK_1400_805, NULL, "mitsubishi-3020dae" }, /* Duplicate */
-		{ 0, 0, 0, NULL, NULL}
-	}
 };
 
 /* Kodak 1400/805 data format

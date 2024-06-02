@@ -1,7 +1,7 @@
 /*
- *   Kodak 6800/6850 Photo Printer CUPS backend -- libusb-1.0 version
+ *   Kodak 6800/6850 Photo Printer CUPS backend
  *
- *   (c) 2013-2021 Solomon Peachy <pizza@shaftnet.org>
+ *   (c) 2013-2024 Solomon Peachy <pizza@shaftnet.org>
  *
  *   Development of this backend was sponsored by:
  *
@@ -9,7 +9,7 @@
  *
  *   The latest version of this program can be found at:
  *
- *     https://git.shaftnet.org/cgit/selphy_print.git
+ *     https://git.shaftnet.org/gitea/slp/selphy_print.git
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the Free
@@ -107,7 +107,7 @@ struct kodak6800_ctx {
 
 /* Baseline commands */
 static int kodak6800_do_cmd(struct kodak6800_ctx *ctx,
-			    void *cmd, int cmd_len,
+			    const void *cmd, int cmd_len,
 			    void *resp, int resp_len,
 			    int *actual_len)
 {
@@ -711,7 +711,7 @@ static int kodak6800_attach(void *vctx, struct dyesub_connection *conn, uint8_t 
 	} else {
 		int media_code = KODAK6_MEDIA_6TR2;
 		if (getenv("MEDIA_CODE"))
-			media_code = atoi(getenv("MEDIA_CODE"));
+			media_code = strtol(getenv("MEDIA_CODE"), NULL, 16);
 
 		ctx->media_type = media_code;
 		ctx->supports_sub4x6 = 1;
@@ -1060,6 +1060,12 @@ static const char *kodak6800_prefixes[] = {
 	NULL
 };
 
+static const struct device_id kodak6800_devices[] = {
+	{ 0x040a, 0x4021, P_KODAK_6800, "Kodak", "kodak-6800"}, /* Shinko CHC-S1145-5A */
+	{ 0x040a, 0x402b, P_KODAK_6850, "Kodak", "kodak-6850"}, /* Shinko CHC-S1145-5B */
+	{ 0, 0, 0, NULL, NULL}
+};
+
 /* Exported */
 const struct dyesub_backend kodak6800_backend = {
 	.name = "Kodak 6800/6850",
@@ -1075,11 +1081,7 @@ const struct dyesub_backend kodak6800_backend = {
 	.query_serno = kodak6800_query_serno,
 	.query_markers = kodak6800_query_markers,
 	.query_stats = kodak6800_query_stats,
-	.devices = {
-		{ 0x040a, 0x4021, P_KODAK_6800, "Kodak", "kodak-6800"},
-		{ 0x040a, 0x402b, P_KODAK_6850, "Kodak", "kodak-6850"},
-		{ 0, 0, 0, NULL, NULL}
-	}
+	.devices = kodak6800_devices,
 };
 
 /* Kodak 6800/6850 data format
@@ -1101,12 +1103,6 @@ const struct dyesub_backend kodak6800_backend = {
   SS                             Print size -- 0x00 (4x6) 0x06 (8x6) 0x07 (5x7 on 6850)
   LL                             Laminate mode -- 0x00 (off) or 0x01 (on)
   UU                             Print mode -- 0x00 (normal) or 0x01 (4x6 on 8x6) 0x21 (2x6) 0x23 (3x6)
-
-  ************************************************************************
-
-  Note:  6800 is Shinko CHC-S1145-5A, 6850 is Shinko CHC-S1145-5B
-
-  Both are very similar to Shinko S1245!
 
   ************************************************************************
 

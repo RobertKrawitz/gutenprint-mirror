@@ -1,7 +1,7 @@
 /*
- *   Citizen / DNP Photo Printer CUPS backend -- libusb-1.0 version
+ *   Citizen / DNP Photo Printer CUPS backend
  *
- *   (c) 2013-2023 Solomon Peachy <pizza@shaftnet.org>
+ *   (c) 2013-2024 Solomon Peachy <pizza@shaftnet.org>
  *
  *   Development of this backend was sponsored by:
  *
@@ -11,7 +11,7 @@
  *
  *   The latest version of this program can be found at:
  *
- *     https://git.shaftnet.org/cgit/selphy_print.git
+ *     https://git.shaftnet.org/gitea/slp/selphy_print.git
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the Free
@@ -132,7 +132,7 @@ struct dnpds40_ctx {
 	int supports_keepmode;
 	int supports_6x4_5;
 	int supports_mqty_default;
-	int supports_iserial;
+	int supports_iserial;  /* 0 == no, 1 == configurable, 2 == always enabled */
 	int supports_6x6;
 	int supports_5x5;
 	int supports_counterp;
@@ -272,18 +272,6 @@ static void dnpds40_cleanup_job(const void *vjob);
 static int dnpds40_query_markers(void *vctx, struct marker **markers, int *count);
 
 /* Panorama crap */
-struct panodata_row {
-	uint16_t start_row;
-	double rhYMC[3];
-	double lhYMC[3];
-};
-
-#define DNP_PANO_MAXROWS 64
-struct dnp_panodata {
-	uint16_t elements;
-	struct panodata_row rows[DNP_PANO_MAXROWS];
-};
-
 #ifdef USE_PANODATA_FILES
 #define PANODATA_DS620 "LUTData_0010.csv"
 #define PANODATA_DS820 "LUTData820_0010.csv"
@@ -1502,6 +1490,9 @@ static int dnpds40_attach(void *vctx, struct dyesub_connection *conn, uint8_t jo
 			ctx->supports_3x5x2 = 1;
 		if (FW_VER_CHECK(1,60))
 			ctx->supports_fullcut = ctx->supports_6x6 = 1; // No 5x5!
+		if (FW_VER_CHECK(1,70))
+			/* Always reports iSerial, not configurable */
+			ctx->supports_iserial = 2;
 		break;
 	case P_DNP_DS80:
 	case P_DNP_DS80D:
@@ -1511,6 +1502,9 @@ static int dnpds40_attach(void *vctx, struct dyesub_connection *conn, uint8_t jo
 			ctx->supports_counterp = 1;
 		if (FW_VER_CHECK(1,30))
 			ctx->supports_matte = 1;
+		if (FW_VER_CHECK(1,42))
+			/* Always reports iSerial, not configurable */
+			ctx->supports_iserial = 2;
 		break;
 	case P_DNP_DSRX1:
 		ctx->native_width = 1920;
@@ -1764,7 +1758,7 @@ static int dnpds40_attach(void *vctx, struct dyesub_connection *conn, uint8_t jo
 		}
 
 		if (getenv("MEDIA_CODE"))
-			ctx->media = atoi(getenv("MEDIA_CODE"));
+			ctx->media = strtol(getenv("MEDIA_CODE"), NULL, 10);
 	}
 
 	ctx->last_matte = -1;
@@ -3667,7 +3661,9 @@ CWD_TOP:
 		free(resp);
 	}
 
-	if (ctx->supports_iserial) {
+	if (ctx->supports_iserial == 2) {
+		INFO("Report Serial Number in USB descriptor: Yes\n");
+	} else if (ctx->supports_iserial == 1) {
 		int i;
 		/* Get USB serial descriptor status */
 		dnpds40_build_cmd(&cmd, "MNT_RD", "USB_ISERI_SET", 0);
@@ -4424,8 +4420,8 @@ static int dnpds40_cmdline_arg(void *vctx, int argc, char **argv)
 		}
 		case 'x': {
 			int enable = atoi(optarg);
-			if (!ctx->supports_iserial) {
-				ERROR("Printer does not support USB iSerialNumber reporting\n");
+			if (ctx->supports_iserial != 1) {
+				ERROR("Printer does not support configuring iSerialNumber reporting!\n");
 				j = -1;
 				break;
 			}
@@ -4612,10 +4608,36 @@ static const char *dnpds40_prefixes[] = {
 	NULL
 };
 
+static const struct device_id dnpcitizen_devices[] = {
+	{ 0x1343, 0x0003, P_DNP_DS40, NULL, "dnp-ds40"},
+	{ 0x1343, 0x0003, P_DNP_DS40, NULL, "citizen-cx"}, /* Duplicate */
+	{ 0x1343, 0x0004, P_DNP_DS80, NULL, "dnp-ds80"},
+	{ 0x1343, 0x0004, P_DNP_DS80, NULL, "citizen-cx-w"}, /* Duplicate */
+	{ 0x1343, 0x0004, P_DNP_DS80, NULL, "mitsubishi-cp3800dw"}, /* Duplicate */
+	{ 0x1343, 0x0008, P_DNP_DS80D, NULL, "dnp-ds80dx"},
+	{ 0x1343, 0x0005, P_DNP_DSRX1, NULL, "dnp-dsrx1"},
+	{ 0x1343, 0x0005, P_DNP_DSRX1, NULL, "citizen-cy"}, /* Duplicate */
+	{ 0x1343, 0x0005, P_DNP_DSRX1, NULL, "citizen-cy-02"}, /* Duplicate */
+	{ 0x1452, 0x8b01, P_DNP_DS620, NULL, "dnp-ds620"},
+	{ 0x1452, 0x9001, P_DNP_DS820, NULL, "dnp-ds820"},
+	{ 0x1452, 0x9201, P_DNP_QW410, NULL, "dnp-qw410"},
+	{ 0x1343, 0x0002, P_CITIZEN_CW01, NULL, "citizen-cw-01"},
+	{ 0x1343, 0x0002, P_CITIZEN_CW01, NULL, "citizen-op900"}, /* Duplicate */
+	{ 0x1343, 0x0006, P_CITIZEN_OP900II, NULL, "citizen-cw-02"},
+	{ 0x1343, 0x0006, P_CITIZEN_OP900II, NULL, "citizen-op900ii"}, /* Duplicate */
+	{ 0x1343, 0x000a, P_DNP_DS620, NULL, "citizen-cx-02"},
+//	{ 0x1343, 0xXXXX, P_DNP_DS620, NULL, "citizen-cx-02s"},
+	{ 0x1343, 0x000b, P_DNP_DS820, NULL, "citizen-cx-02w"},
+	{ 0x1343, 0x000c, P_DNP_QW410, NULL, "citizen-cz-01"},
+//	{ 0x04cb, 0xXXXX, P_DNP_DS620, NULL, "fujifilm-ask-400"},
+	{ 0, 0, 0, NULL, NULL}
+};
+
 const struct dyesub_backend dnpds40_backend = {
 	.name = "DNP DS-series / Citizen C-series",
-	.version = "0.155",
+	.version = "0.157",
 	.uri_prefixes = dnpds40_prefixes,
+	.devices = dnpcitizen_devices,
 	.cmdline_usage = dnpds40_cmdline,
 	.cmdline_arg = dnpds40_cmdline_arg,
 	.init = dnpds40_init,
@@ -4629,30 +4651,6 @@ const struct dyesub_backend dnpds40_backend = {
 	.query_stats = dnp_query_stats,
 	.combine_jobs = dnp_combine_jobs,
 	.job_polarity = dnp_job_polarity,
-	.devices = {
-		{ 0x1343, 0x0003, P_DNP_DS40, NULL, "dnp-ds40"},
-		{ 0x1343, 0x0003, P_DNP_DS40, NULL, "citizen-cx"}, /* Duplicate */
-		{ 0x1343, 0x0004, P_DNP_DS80, NULL, "dnp-ds80"},
-		{ 0x1343, 0x0004, P_DNP_DS80, NULL, "citizen-cx-w"}, /* Duplicate */
-		{ 0x1343, 0x0004, P_DNP_DS80, NULL, "mitsubishi-cp3800dw"}, /* Duplicate */
-		{ 0x1343, 0x0008, P_DNP_DS80D, NULL, "dnp-ds80dx"},
-		{ 0x1343, 0x0005, P_DNP_DSRX1, NULL, "dnp-dsrx1"},
-		{ 0x1343, 0x0005, P_DNP_DSRX1, NULL, "citizen-cy"}, /* Duplicate */
-		{ 0x1343, 0x0005, P_DNP_DSRX1, NULL, "citizen-cy-02"}, /* Duplicate */
-		{ 0x1452, 0x8b01, P_DNP_DS620, NULL, "dnp-ds620"},
-		{ 0x1452, 0x9001, P_DNP_DS820, NULL, "dnp-ds820"},
-		{ 0x1452, 0x9201, P_DNP_QW410, NULL, "dnp-qw410"},
-		{ 0x1343, 0x0002, P_CITIZEN_CW01, NULL, "citizen-cw-01"},
-		{ 0x1343, 0x0002, P_CITIZEN_CW01, NULL, "citizen-op900"}, /* Duplicate */
-		{ 0x1343, 0x0006, P_CITIZEN_OP900II, NULL, "citizen-cw-02"},
-		{ 0x1343, 0x0006, P_CITIZEN_OP900II, NULL, "citizen-op900ii"}, /* Duplicate */
-		{ 0x1343, 0x000a, P_DNP_DS620, NULL, "citizen-cx-02"},
-//		{ 0x1343, 0xXXXX, P_DNP_DS620, NULL, "citizen-cx-02s"},
-		{ 0x1343, 0x000b, P_DNP_DS820, NULL, "citizen-cx-02w"},
-		{ 0x1343, 0x000c, P_DNP_QW410, NULL, "citizen-cz-01"},
-//		{ 0x04cb, 0xXXXX, P_DNP_DS620, NULL, "fujifilm-ask-400"},
-		{ 0, 0, 0, NULL, NULL}
-	}
 };
 
 /* Windows spool file support */

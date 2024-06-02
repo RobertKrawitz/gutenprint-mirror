@@ -1,11 +1,11 @@
  /*
  *   Shinko/Sinfonia Common Code
  *
- *   (c) 2019-2021 Solomon Peachy <pizza@shaftnet.org>
+ *   (c) 2019-2024 Solomon Peachy <pizza@shaftnet.org>
  *
  *   The latest version of this program can be found at:
  *
- *     https://git.shaftnet.org/cgit/selphy_print.git
+ *     https://git.shaftnet.org/gitea/slp/selphy_print.git
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the Free
@@ -24,7 +24,7 @@
  *
  */
 
-#define LIBSINFONIA_VER "0.19"
+#define LIBSINFONIA_VER "0.20"
 
 #define SINFONIA_HDR1_LEN 0x10
 #define SINFONIA_HDR2_LEN 0x64
@@ -228,7 +228,7 @@ struct sinfonia_usbdev {
 	char const *(*error_codes)(uint8_t major, uint8_t minor);
 };
 int sinfonia_docmd(struct sinfonia_usbdev *usbh,
-		   uint8_t *cmd, int cmdlen,
+		   const uint8_t *cmd, int cmdlen,
 		   uint8_t *resp, int resplen,
 		   int *num);
 int sinfonia_flashled(struct sinfonia_usbdev *usbh);
@@ -253,8 +253,18 @@ const char *sinfonia_paramname(struct sinfonia_usbdev *usbh, int id);
 
 const char *sinfonia_bank_statuses(uint8_t v);
 
+#define UPDATE_TARGET2_FIRMWARE      0x00
+#define UPDATE_TARGET2_TONE          0x01
+
+#define UPDATE_TARGET_FIRMWARE_DSP   0x00
+#define UPDATE_TARGET_FIRMWARE_MAIN  0x01
+#define UPDATE_TARGET_FIRMWARE_TABLE 0x02
+
 #define UPDATE_TARGET_TONE_USER     0x03
 #define UPDATE_TARGET_TONE_CURRENT  0x04
+
+#define UPDATE_TARGET2_LAM      0x00  // ???
+
 #define UPDATE_TARGET_LAM_USER 0x10
 #define UPDATE_TARGET_LAM_DEF  0x11
 #define UPDATE_TARGET_LAM_CUR  0x12
@@ -501,9 +511,9 @@ struct sinfonia_readtone_resp {
 
 struct sinfonia_update_cmd {
 	struct sinfonia_cmd_hdr hdr;
-	uint8_t  target;    // UPDATE_TARGET_TONE_*
-	uint8_t  curve_id;  // 00 for lamination, 01 for tone?
-	uint8_t  reset;     // ??
+	uint8_t  target;    // UPDATE_TARGET_*
+	uint8_t  target2;   // UPDATE_TARGET2_*
+	uint8_t  reset;     // 1 to reset printer afterwards
 	uint8_t  reserved[3];
 	uint32_t size;  // TONE_CURVE_SIZE or lamination data that is rows*cols bytes
 } __attribute__((packed));
@@ -590,6 +600,14 @@ struct sinfonia_settime_cmd {
 	uint8_t day;
 	uint8_t month;
 	uint8_t year;
+} __attribute__((packed));
+
+struct sinfonia_usbfwdl_cmd {
+	struct sinfonia_cmd_hdr hdr;
+	uint8_t  reset;
+	uint16_t unka; /* LE, 0x4000 on EK70xx? */
+	uint16_t len;  /* LE, Always seems to be 0xc000 */
+	uint8_t  payload[];
 } __attribute__((packed));
 
 struct kodak701x_backprint {

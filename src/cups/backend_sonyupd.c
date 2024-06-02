@@ -1,11 +1,11 @@
 /*
- *   Sony UP-D series Photo Printer CUPS backend -- libusb-1.0 version
+ *   Sony UP-D series Photo Printer CUPS backend
  *
- *   (c) 2013-2023 Solomon Peachy <pizza@shaftnet.org>
+ *   (c) 2013-2024 Solomon Peachy <pizza@shaftnet.org>
  *
  *   The latest version of this program can be found at:
  *
- *     https://git.shaftnet.org/cgit/selphy_print.git
+ *     https://git.shaftnet.org/gitea/slp/selphy_print.git
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the Free
@@ -318,7 +318,7 @@ static int upd_attach(void *vctx, struct dyesub_connection *conn, uint8_t jobid)
 	}
 
 	if (test_mode >= TEST_MODE_NOATTACH && getenv("MEDIA_CODE")) {
-		ctx->marker.numtype = atoi(getenv("MEDIA_CODE"));
+		ctx->marker.numtype = strtol(getenv("MEDIA_CODE"), NULL, 16);
 	} else {
 		ctx->marker.numtype = ctx->stsbuf.ribbon;
 	}
@@ -981,10 +981,29 @@ static const char *sonyupd_prefixes[] = {
 	NULL
 };
 
+static const struct device_id sonyupd_devices[] = {
+	{ 0x054c, 0x0049, P_SONY_UPD895, NULL, "sony-upd895"},
+	{ 0x054c, 0x01e7, P_SONY_UPD897, NULL, "sony-upd897"},
+	{ 0x054c, 0x01e8, P_SONY_UPDR150, NULL, "sony-updr150"},
+	{ 0x054c, 0x0226, P_SONY_UPCR10, NULL, "sony-upcr10l"},
+	{ 0x054c, 0x02d4, P_SONY_UPCR10, NULL, "sony-upcx1"},
+	{ 0x054c, 0x035f, P_SONY_UPDR150, NULL, "sony-updr200"},
+	{ 0x054c, 0x068c, P_SONY_UPD711, NULL, "sony-upd711"},
+	{ 0x07ce, 0xc007, P_NDC, NULL, "ndc-dpb-4000"},
+	{ 0x07ce, 0xc007, P_NDC, NULL, "fujifilm-ask-4000"},
+	// DNP Q8?
+	{ 0x07ce, 0xc009, P_NDC, NULL, "ndc-dpb-6000"},
+	{ 0x07ce, 0xc009, P_NDC, NULL, "fujifilm-ask-2000"}, // duplicate, has different IEEE1284
+	{ 0x07ce, 0xc010, P_NDC, NULL, "ndc-dpb-7000"},
+	{ 0x07ce, 0xc011, P_NDC, NULL, "fujifilm-ask-2500"},
+	{ 0, 0, 0, NULL, NULL}
+};
+
 const struct dyesub_backend sonyupd_backend = {
 	.name = "Sony UP-D",
-	.version = "0.54",
+	.version = "0.55",
 	.uri_prefixes = sonyupd_prefixes,
+	.devices = sonyupd_devices,
 	.cmdline_arg = upd_cmdline_arg,
 	.cmdline_usage = upd_cmdline,
 	.init = upd_init,
@@ -993,20 +1012,6 @@ const struct dyesub_backend sonyupd_backend = {
 	.read_parse = upd_read_parse,
 	.main_loop = upd_main_loop,
 	.query_markers = upd_query_markers,
-	.devices = {
-		{ 0x054c, 0x0049, P_SONY_UPD895, NULL, "sony-upd895"},
-		{ 0x054c, 0x01e7, P_SONY_UPD897, NULL, "sony-upd897"},
-		{ 0x054c, 0x01e8, P_SONY_UPDR150, NULL, "sony-updr150"},
-		{ 0x054c, 0x0226, P_SONY_UPCR10, NULL, "sony-upcr10l"},
-		{ 0x054c, 0x02d4, P_SONY_UPCR10, NULL, "sony-upcx1"},
-		{ 0x054c, 0x035f, P_SONY_UPDR150, NULL, "sony-updr200"},
-		{ 0x054c, 0x068c, P_SONY_UPD711, NULL, "sony-upd711"},
-		{ 0x07ce, 0xc011, P_NDC, NULL, "ndc-dpb-7000"},
-		{ 0x07ce, 0xc011, P_NDC, NULL, "fujifilm-ask-2500"}, // duplicate, has different IEEE1284
-		// DPB-6000/ASK-2000
-		// DPB-4000/ASK-4000/DNP Q8
-		{ 0, 0, 0, NULL, NULL}
-	}
 };
 
 /* Sony spool file format

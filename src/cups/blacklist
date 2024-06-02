@@ -321,6 +321,15 @@
 # HiTi CS-290e
 0x0d16 0x030d blacklist
 
+# HiTi P310L
+#0x0d16 0x0503 blacklist
+
+# HiTi P310W
+#0x0d16 0x050a blacklist
+
+# HiTi P320W
+#0x0d16 0x050c blacklist
+
 # HiTi P461 (Prinhome)
 0x0d16 0x0509 blacklist
 
@@ -375,6 +384,16 @@
 # Magicard Enduro+
 0x0c1f 0x880a blacklist
 
+# Nidec Copal DPB-4000
+# Fujifilm ASK-4000
+# DNP Q8 maybe?
+0x07ce 0xc007 blacklist
+
+# Nidec Copal DPB-6000
+# Fujifilm ASK-2000
+0x07ce 0xc009 blacklist
+
 # Nidec Copal DPB-7000
+0x07ce 0xc010 blacklist
 # Fujifilm ASK-2500
 0x07ce 0xc011 blacklist

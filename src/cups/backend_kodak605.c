@@ -1,11 +1,11 @@
 /*
- *   Kodak 605 Photo Printer CUPS backend -- libusb-1.0 version
+ *   Kodak 605 Photo Printer CUPS backend
  *
- *   (c) 2013-2023 Solomon Peachy <pizza@shaftnet.org>
+ *   (c) 2013-2024 Solomon Peachy <pizza@shaftnet.org>
  *
  *   The latest version of this program can be found at:
  *
- *     https://git.shaftnet.org/cgit/selphy_print.git
+ *     https://git.shaftnet.org/gitea/slp/selphy_print.git
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the Free
@@ -437,7 +437,7 @@ static int kodak605_attach(void *vctx, struct dyesub_connection *conn, uint8_t j
 	} else {
 		int media_code = KODAK6_MEDIA_6TR2;
 		if (getenv("MEDIA_CODE"))
-			media_code = atoi(getenv("MEDIA_CODE"));
+			media_code = strtol(getenv("MEDIA_CODE"), NULL, 16);
 
 		ctx->media->type = media_code;
 	}
@@ -945,11 +945,21 @@ static const char *kodak605_prefixes[] = {
 	NULL,
 };
 
+static const struct device_id kodak605_devices[] = {
+	{ 0x040a, 0x402e, P_KODAK_605, "Kodak", "kodak-605"},   /* Shinko CHC-S1545-5A */
+	{ 0x040a, 0x4035, P_KODAK_7000, "Kodak", "kodak-7000"}, /* Shinko CHC-S1645-5A */
+	{ 0x040a, 0x4037, P_KODAK_701X, "Kodak", "kodak-7010"}, /* Shinko CHC-S1645-5B */
+	{ 0x040a, 0x4038, P_KODAK_701X, "Kodak", "kodak-7015"}, /* Shinko CHC-S1645-5C */
+	{ 0, 0, 0, NULL, NULL}
+};
+
+
 /* Exported */
 const struct dyesub_backend kodak605_backend = {
 	.name = "Kodak 605/70xx",
 	.version = "0.57" " (lib " LIBSINFONIA_VER ")",
 	.uri_prefixes = kodak605_prefixes,
+	.devices = kodak605_devices,
 	.cmdline_usage = kodak605_cmdline,
 	.cmdline_arg = kodak605_cmdline_arg,
 	.init = kodak605_init,
@@ -961,13 +971,6 @@ const struct dyesub_backend kodak605_backend = {
 	.query_markers = kodak605_query_markers,
 	.query_serno = sinfonia_query_serno,
 	.query_stats = kodak605_query_stats,
-	.devices = {
-		{ 0x040a, 0x402e, P_KODAK_605, "Kodak", "kodak-605"},
-		{ 0x040a, 0x4035, P_KODAK_7000, "Kodak", "kodak-7000"},
-		{ 0x040a, 0x4037, P_KODAK_701X, "Kodak", "kodak-7010"},
-		{ 0x040a, 0x4038, P_KODAK_701X, "Kodak", "kodak-7015"}, /* Duplicate */
-		{ 0, 0, 0, NULL, NULL}
-	}
 };
 
 /* Kodak 605/70xx data format
@@ -999,13 +1002,6 @@ const struct dyesub_backend kodak605_backend = {
      0x09   5x7.5
      0x0d   5x3.5
      0x0e   6x6
-
-  ************************************************************************
-
-  Note:  Kodak 605  is actually a Shinko CHC-S1545-5A
-  Note:  Kodak 7000 is actually a Shinko CHC-S1645-5A
-  Note:  Kodak 7010 is actually a Shinko CHC-S1645-5B
-  Note:  Kodak 7015 is actually a Shinko CHC-S1645-5C
 
   ************************************************************************
 

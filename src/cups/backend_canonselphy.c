@@ -1,11 +1,11 @@
 /*
- *   Canon SELPHY ES/CP series CUPS backend -- libusb-1.0 version
+ *   Canon SELPHY ES/CP series CUPS backend
  *
- *   (c) 2007-2021 Solomon Peachy <pizza@shaftnet.org>
+ *   (c) 2007-2024 Solomon Peachy <pizza@shaftnet.org>
  *
  *   The latest version of this program can be found at:
  *
- *     https://git.shaftnet.org/cgit/selphy_print.git
+ *     https://git.shaftnet.org/gitea/slp/selphy_print.git
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the Free
@@ -48,11 +48,11 @@ struct printer_data {
 	int8_t  pgcode_offset;  /* Offset into printjob for paper type */
 	int8_t  paper_code_offset; /* Offset in readback for paper type */
 	int8_t  paper_code_offset2; /* Offset in readback for paper type (2nd) */
-	uint8_t (*error_detect)(uint8_t *rdbuf);
-	const char    *(*pgcode_names)(uint8_t *rdbuf, struct printer_data *printer, int *numtype);
+	uint8_t (*error_detect)(const uint8_t *rdbuf);
+	const char    *(*pgcode_names)(const uint8_t *rdbuf, const struct printer_data *printer, int *numtype);
 };
 
-static const char *generic_pgcode_names(uint8_t *rdbuf, struct printer_data *printer, int *numtype)
+static const char *generic_pgcode_names(const uint8_t *rdbuf, const struct printer_data *printer, int *numtype)
 {
 	uint8_t pgcode = 0, pgcode2 = 0;
 
@@ -73,7 +73,7 @@ static const char *generic_pgcode_names(uint8_t *rdbuf, struct printer_data *pri
 	}
 }
 
-static uint8_t es1_error_detect(uint8_t *rdbuf)
+static uint8_t es1_error_detect(const uint8_t *rdbuf)
 {
 	if (rdbuf[1] == 0x01) {
 		if (rdbuf[9] == 0x00)
@@ -93,7 +93,7 @@ static uint8_t es1_error_detect(uint8_t *rdbuf)
 	return CUPS_BACKEND_OK;
 }
 
-static uint8_t es2_error_detect(uint8_t *rdbuf)
+static uint8_t es2_error_detect(const uint8_t *rdbuf)
 {
 	if (rdbuf[0] == 0x16 &&
 	    rdbuf[1] == 0x01) {
@@ -117,7 +117,7 @@ static uint8_t es2_error_detect(uint8_t *rdbuf)
 	return CUPS_BACKEND_OK;
 }
 
-static uint8_t es3_error_detect(uint8_t *rdbuf)
+static uint8_t es3_error_detect(const uint8_t *rdbuf)
 {
 	if (rdbuf[8] == 0x01) {
 		if (rdbuf[10] == 0x0f)
@@ -151,7 +151,7 @@ static uint8_t es3_error_detect(uint8_t *rdbuf)
 	return CUPS_BACKEND_OK;
 }
 
-static uint8_t es40_error_detect(uint8_t *rdbuf)
+static uint8_t es40_error_detect(const uint8_t *rdbuf)
 {
 	/* ES40 */
 	if (!rdbuf[3])
@@ -167,7 +167,7 @@ static uint8_t es40_error_detect(uint8_t *rdbuf)
 	return 1;
 }
 
-static const char *cp790_pgcode_names(uint8_t *rdbuf, struct printer_data *printer, int *numtype)
+static const char *cp790_pgcode_names(const uint8_t *rdbuf, const struct printer_data *printer, int *numtype)
 {
 	UNUSED(printer);
 	UNUSED(numtype);
@@ -182,7 +182,7 @@ static const char *cp790_pgcode_names(uint8_t *rdbuf, struct printer_data *print
 	}
 }
 
-static uint8_t cp790_error_detect(uint8_t *rdbuf)
+static uint8_t cp790_error_detect(const uint8_t *rdbuf)
 {
 	/* CP790 */
 	if (rdbuf[5] == 0xff) {
@@ -208,7 +208,7 @@ static uint8_t cp790_error_detect(uint8_t *rdbuf)
 	return CUPS_BACKEND_OK;
 }
 
-static const char *cp10_pgcode_names(uint8_t *rdbuf, struct printer_data *printer, int *numtype)
+static const char *cp10_pgcode_names(const uint8_t *rdbuf, const struct printer_data *printer, int *numtype)
 {
 	UNUSED(rdbuf);
 	UNUSED(printer);
@@ -217,7 +217,7 @@ static const char *cp10_pgcode_names(uint8_t *rdbuf, struct printer_data *printe
 	return "C";   /* Printer only supports one media type */
 }
 
-static uint8_t cp10_error_detect(uint8_t *rdbuf)
+static uint8_t cp10_error_detect(const uint8_t *rdbuf)
 {
 	if (!rdbuf[2])
 		return CUPS_BACKEND_OK;
@@ -233,7 +233,7 @@ static uint8_t cp10_error_detect(uint8_t *rdbuf)
 	return 1;
 }
 
-static uint8_t cpxxx_error_detect(uint8_t *rdbuf)
+static uint8_t cpxxx_error_detect(const uint8_t *rdbuf)
 {
 	if (!rdbuf[2])
 		return CUPS_BACKEND_OK;
@@ -1114,11 +1114,45 @@ static const char *canonselphy_prefixes[] = {
 	"selphyes30", "selphyes40",
 	NULL
 };
+static const struct device_id canonselphy_devices[] = {
+	{ 0x04a9, 0x304a, P_CP10, NULL, "canon-cp10"},
+	{ 0x04a9, 0x3063, P_CPGENERIC, NULL, "canon-cp100"},
+	{ 0x04a9, 0x307c, P_CPGENERIC, NULL, "canon-cp200"},
+	{ 0x04a9, 0x30bd, P_CPGENERIC, NULL, "canon-cp220"},
+	{ 0x04a9, 0x307d, P_CPGENERIC, NULL, "canon-cp300"},
+	{ 0x04a9, 0x30be, P_CPGENERIC, NULL, "canon-cp330"},
+	{ 0x04a9, 0x30f6, P_CPGENERIC, NULL, "canon-cp400"},
+	{ 0x04a9, 0x30f5, P_CPGENERIC, NULL, "canon-cp500"},
+	{ 0x04a9, 0x3128, P_CPGENERIC, NULL, "canon-cp510"},
+	{ 0x04a9, 0x3172, P_CPGENERIC, NULL, "canon-cp520"},
+	{ 0x04a9, 0x31b1, P_CPGENERIC, NULL, "canon-cp530"},
+	{ 0x04a9, 0x310b, P_CPGENERIC, NULL, "canon-cp600"},
+	{ 0x04a9, 0x3127, P_CPGENERIC, NULL, "canon-cp710"},
+	{ 0x04a9, 0x3143, P_CPGENERIC, NULL, "canon-cp720"},
+	{ 0x04a9, 0x3142, P_CPGENERIC, NULL, "canon-cp730"},
+	{ 0x04a9, 0x3171, P_CPGENERIC, NULL, "canon-cp740"},
+	{ 0x04a9, 0x3170, P_CPGENERIC, NULL, "canon-cp750"},
+	{ 0x04a9, 0x31ab, P_CPGENERIC, NULL, "canon-cp760"},
+	{ 0x04a9, 0x31aa, P_CPGENERIC, NULL, "canon-cp770"},
+	{ 0x04a9, 0x31dd, P_CPGENERIC, NULL, "canon-cp780"},
+	{ 0x04a9, 0x31e7, P_CP790, NULL, "canon-cp790"},
+	{ 0x04a9, 0x3214, P_CPGENERIC, NULL, "canon-cp800"},
+	{ 0x04a9, 0x3256, P_CPGENERIC, NULL, "canon-cp810"},
+	{ 0x04a9, 0x3255, P_CPGENERIC, NULL, "canon-cp900"},
+	{ 0x04a9, 0x3141, P_ES1, NULL, "canon-es1"},
+	{ 0x04a9, 0x3185, P_ES2_20, NULL, "canon-es2"},
+	{ 0x04a9, 0x3186, P_ES2_20, NULL, "canon-es20"},
+	{ 0x04a9, 0x31af, P_ES3_30, NULL, "canon-es3"},
+	{ 0x04a9, 0x31b0, P_ES3_30, NULL, "canon-es30"},
+	{ 0x04a9, 0x31ee, P_ES40, NULL, "canon-es40"},
+	{ 0, 0, 0, NULL, NULL}
+};
 
 const struct dyesub_backend canonselphy_backend = {
 	.name = "Canon SELPHY CP/ES (legacy)",
 	.version = "0.113",
 	.uri_prefixes = canonselphy_prefixes,
+	.devices = canonselphy_devices,
 	.cmdline_usage = canonselphy_cmdline,
 	.cmdline_arg = canonselphy_cmdline_arg,
 	.init = canonselphy_init,
@@ -1127,39 +1161,6 @@ const struct dyesub_backend canonselphy_backend = {
 	.cleanup_job = canonselphy_cleanup_job,
 	.main_loop = canonselphy_main_loop,
 	.query_markers = canonselphy_query_markers,
-	.devices = {
-		{ 0x04a9, 0x304a, P_CP10, NULL, "canon-cp10"},
-		{ 0x04a9, 0x3063, P_CPGENERIC, NULL, "canon-cp100"},
-		{ 0x04a9, 0x307c, P_CPGENERIC, NULL, "canon-cp200"},
-		{ 0x04a9, 0x30bd, P_CPGENERIC, NULL, "canon-cp220"},
-		{ 0x04a9, 0x307d, P_CPGENERIC, NULL, "canon-cp300"},
-		{ 0x04a9, 0x30be, P_CPGENERIC, NULL, "canon-cp330"},
-		{ 0x04a9, 0x30f6, P_CPGENERIC, NULL, "canon-cp400"},
-		{ 0x04a9, 0x30f5, P_CPGENERIC, NULL, "canon-cp500"},
-		{ 0x04a9, 0x3128, P_CPGENERIC, NULL, "canon-cp510"},
-		{ 0x04a9, 0x3172, P_CPGENERIC, NULL, "canon-cp520"},
-		{ 0x04a9, 0x31b1, P_CPGENERIC, NULL, "canon-cp530"},
-		{ 0x04a9, 0x310b, P_CPGENERIC, NULL, "canon-cp600"},
-		{ 0x04a9, 0x3127, P_CPGENERIC, NULL, "canon-cp710"},
-		{ 0x04a9, 0x3143, P_CPGENERIC, NULL, "canon-cp720"},
-		{ 0x04a9, 0x3142, P_CPGENERIC, NULL, "canon-cp730"},
-		{ 0x04a9, 0x3171, P_CPGENERIC, NULL, "canon-cp740"},
-		{ 0x04a9, 0x3170, P_CPGENERIC, NULL, "canon-cp750"},
-		{ 0x04a9, 0x31ab, P_CPGENERIC, NULL, "canon-cp760"},
-		{ 0x04a9, 0x31aa, P_CPGENERIC, NULL, "canon-cp770"},
-		{ 0x04a9, 0x31dd, P_CPGENERIC, NULL, "canon-cp780"},
-		{ 0x04a9, 0x31e7, P_CP790, NULL, "canon-cp790"},
-		{ 0x04a9, 0x3214, P_CPGENERIC, NULL, "canon-cp800"},
-		{ 0x04a9, 0x3256, P_CPGENERIC, NULL, "canon-cp810"},
-		{ 0x04a9, 0x3255, P_CPGENERIC, NULL, "canon-cp900"},
-		{ 0x04a9, 0x3141, P_ES1, NULL, "canon-es1"},
-		{ 0x04a9, 0x3185, P_ES2_20, NULL, "canon-es2"},
-		{ 0x04a9, 0x3186, P_ES2_20, NULL, "canon-es20"},
-		{ 0x04a9, 0x31af, P_ES3_30, NULL, "canon-es3"},
-		{ 0x04a9, 0x31b0, P_ES3_30, NULL, "canon-es30"},
-		{ 0x04a9, 0x31ee, P_ES40, NULL, "canon-es40"},
-		{ 0, 0, 0, NULL, NULL}
-	}
 };
 /*
 

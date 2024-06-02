@@ -5,7 +5,7 @@
  *
  *   The latest version of this program can be found at:
  *
- *     https://git.shaftnet.org/cgit/selphy_print.git
+ *     https://git.shaftnet.org/gitea/slp/selphy_print.git
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the Free
@@ -974,7 +974,10 @@ repeat:
 
 		if (mhdr.speed == 3) {
 			job->cpcfname = "CPD80S01.cpc";
-			job->ecpcfname = "CPD80E01.cpc"; /* For SuperFine in rewind mode, depending on image.. */
+			if (job->matte || job->cols != 1864 || job->rows != 1228)
+				job->ecpcfname = NULL;
+			else
+				job->ecpcfname = "CPD80E01.cpc"; /* cpc vs ecpc depends on image */
 		} else if (mhdr.speed == 4) {
 			job->cpcfname = "CPD80U01.cpc";
 			job->ecpcfname = NULL;
@@ -1733,7 +1736,7 @@ top:
 	return CUPS_BACKEND_OK;
 }
 
-static int d70_library_callback(void *context, void *buffer, uint32_t len)
+static int d70_library_dout_callback(void *context, void *buffer, uint32_t len)
 {
 	uint32_t chunk = len;
 	uint32_t offset = 0;
@@ -1785,7 +1788,8 @@ static int mitsu70x_main_loop(void *vctx, const void *vjob, int wait_for_return)
 		goto bypass;
 
 	struct BandImage input;
-	uint8_t rew[2] = { 1, 1 }; /* 1 for rewind ok (default!) */
+	uint8_t rew[3] = { 1, 1, 1 }; /* 1 for rewind ok (default!) */
+	// XXX only allow rewinds for appropriate sizes?
 
 	/* Load in the CPC file, if needed */
 	if (job->cpcfname && job->cpcfname != ctx->last_cpcfname) {
@@ -1845,6 +1849,14 @@ static int mitsu70x_main_loop(void *vctx, const void *vjob, int wait_for_return)
 
 	/* Twiddle rewind stuff if needed */
 	if (ctx->conn->type != P_MITSU_D70X) {
+		/* We can't rewind when printing matte or on fine (fastest) speed */
+		if (job->matte || hdr->speed == 0)
+			rew[0] = 0;
+
+		/* We may need to lower the printspeed... */
+		if (rew[2] == 0 && hdr->speed == 3)
+			hdr->speed = 4;
+
 		hdr->rewind[0] = !rew[0];
 		hdr->rewind[1] = !rew[1];
 		DEBUG("Rewind Inhibit? %02x %02x\n", hdr->rewind[0], hdr->rewind[1]);
@@ -1870,7 +1882,7 @@ static int mitsu70x_main_loop(void *vctx, const void *vjob, int wait_for_return)
 		ret = be16_to_cpu(hdr->lamcols) * be16_to_cpu(hdr->lamrows) * 2;
 		memset(job->databuf + job->datalen, 0, job->matte - ret);
 	}
-	job->raw_format = 1;
+	job->raw_format = 2;
 
 bypass:
 	/* Bypass */
@@ -2076,13 +2088,25 @@ top:
 			     sizeof(struct mitsu70x_hdr))))
 		return CUPS_BACKEND_FAILED;
 
-	/* Library handles sending data -- in REVERSE row order! */
-	if (ctx->lib.SendImageData(&ctx->output, ctx, d70_library_callback))
-		return CUPS_BACKEND_FAILED;
-
-	if (job->matte)
-		if (d70_library_callback(ctx, job->databuf + job->datalen - job->matte, job->matte))
+	if (job->raw_format == 2) {
+		/* When we use the library to generate raw data, it needs to be
+		   sent in reverse row order, so use the library to _send_ it too */
+		if (ctx->lib.SendImageData(&ctx->output, ctx, d70_library_dout_callback))
 			return CUPS_BACKEND_FAILED;
+		if (job->matte)
+			if (d70_library_dout_callback(ctx, job->databuf + job->datalen - job->matte, job->matte))
+				return CUPS_BACKEND_FAILED;
+	} else {
+		/* Pre-rendered jobs are already in the correct row order,
+		   so we can send the data ourselves. Note that K60 and EK305
+		   need data sent in 256K chunks, but the first chunk is
+		   reduced by the length of the 512-byte header */
+		int chunk = CHUNK_LEN - sizeof(struct mitsu70x_hdr);
+		int sent = sizeof(struct mitsu70x_hdr);
+		d70_library_dout_callback(ctx, job->databuf + sent, chunk);
+		sent += chunk;
+		d70_library_dout_callback(ctx, job->databuf + sent, job->datalen - sent);
+	}
 
 	/* Then wait for completion, if so desired.. */
 	INFO("Waiting for printer to acknowledge completion\n");
@@ -2600,12 +2624,25 @@ static const char *mitsu70x_prefixes[] = {
 	NULL,
 };
 
+static const struct device_id mitsu70x_devices[] = {
+	{ 0x06d3, 0x3b30, P_MITSU_D70X, NULL, "mitsubishi-d70dw"},
+	{ 0x06d3, 0x3b30, P_MITSU_D70X, NULL, "mitsubishi-d707dw"}, /* Duplicate */
+	{ 0x06d3, 0x3b31, P_MITSU_K60, NULL, "mitsubishi-k60dw"}, // variation type?
+	{ 0x06d3, 0x3b36, P_MITSU_D80, NULL, "mitsubishi-d80dw"},
+	{ 0x040a, 0x404f, P_KODAK_305, NULL, "kodak-305"},
+	{ 0x04cb, 0x5006, P_FUJI_ASK300, NULL, "fujifilm-ask-300"},
+	{ 0x1452, 0x8e01, P_DNP_DSX80, NULL, "dnp-ds680"},
+	{ 0x1452, 0x8f01, P_DNP_DSX80, NULL, "dnp-ds480"},
+	{ 0, 0, 0, NULL, NULL}
+};
+
 /* Exported */
 const struct dyesub_backend mitsu70x_backend = {
 	.name = "Mitsubishi CP-D70 family",
-	.version = "0.111" " (lib " LIBMITSU_VER ")",
+	.version = "0.114" " (lib " LIBMITSU_VER ")",
 	.flags = BACKEND_FLAG_DUMMYPRINT,
 	.uri_prefixes = mitsu70x_prefixes,
+	.devices = mitsu70x_devices,
 	.cmdline_usage = mitsu70x_cmdline,
 	.cmdline_arg = mitsu70x_cmdline_arg,
 	.init = mitsu70x_init,
@@ -2619,17 +2656,6 @@ const struct dyesub_backend mitsu70x_backend = {
 	.query_stats = mitsu70x_query_stats,
 	.combine_jobs = mitsu70x_combine_jobs,
 	.job_polarity = mitsu70x_job_polarity,
-	.devices = {
-		{ 0x06d3, 0x3b30, P_MITSU_D70X, NULL, "mitsubishi-d70dw"},
-		{ 0x06d3, 0x3b30, P_MITSU_D70X, NULL, "mitsubishi-d707dw"}, /* Duplicate */
-		{ 0x06d3, 0x3b31, P_MITSU_K60, NULL, "mitsubishi-k60dw"}, // variation type?
-		{ 0x06d3, 0x3b36, P_MITSU_D80, NULL, "mitsubishi-d80dw"},
-		{ 0x040a, 0x404f, P_KODAK_305, NULL, "kodak-305"},
-		{ 0x04cb, 0x5006, P_FUJI_ASK300, NULL, "fujifilm-ask-300"},
-		{ 0x1452, 0x8e01, P_DNP_DSX80, NULL, "dnp-ds680"},
-		{ 0x1452, 0x8f01, P_DNP_DSX80, NULL, "dnp-ds480"},
-		{ 0, 0, 0, NULL, NULL}
-	}
 };
 
 /* Mitsubish CP-D70DW/D707DW/K60DW-S/D80DW, Kodak 305, Fujifilm ASK-300

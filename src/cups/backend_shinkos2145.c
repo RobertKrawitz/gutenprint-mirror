@@ -1,7 +1,7 @@
 /*
- *   Shinko/Sinfonia CHC-S2145 CUPS backend -- libusb-1.0 version
+ *   Shinko/Sinfonia CHC-S2145 CUPS backend
  *
- *   (c) 2013-2021 Solomon Peachy <pizza@shaftnet.org>
+ *   (c) 2013-2024 Solomon Peachy <pizza@shaftnet.org>
  *
  *   Development of this backend was sponsored by:
  *
@@ -9,7 +9,7 @@
  *
  *   The latest version of this program can be found at:
  *
- *     https://git.shaftnet.org/cgit/selphy_print.git
+ *     https://git.shaftnet.org/gitea/slp/selphy_print.git
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the Free
@@ -536,7 +536,7 @@ static int get_user_string(struct shinkos2145_ctx *ctx)
 	return CUPS_BACKEND_OK;
 }
 
-static int set_user_string(struct shinkos2145_ctx *ctx, char *str)
+static int set_user_string(struct shinkos2145_ctx *ctx, const char *str)
 {
 	struct s2145_setunique_cmd cmd;
 	struct sinfonia_status_hdr resp;
@@ -875,7 +875,7 @@ static int shinkos2145_attach(void *vctx, struct dyesub_connection *conn, uint8_
 	} else {
 		int media_code = CODE_6x9;
 		if (getenv("MEDIA_CODE"))
-			media_code = atoi(getenv("MEDIA_CODE"));
+			media_code = strtol(getenv("MEDIA_CODE"), NULL, 16);
 
 		media_prints = 680;
 		ctx->media_code = media_code;
@@ -1220,10 +1220,19 @@ static const char *shinkos2145_prefixes[] = {
 	NULL
 };
 
+static const struct device_id shinkos2145_devices[] = {
+	{ 0x10ce, 0x000e, P_SHINKO_S2145, NULL, "shinko-chcs2145"},
+	{ 0x10ce, 0x000e, P_SHINKO_S2145, NULL, "sinfonia-chcs2145"}, /* Duplicate */
+	{ 0x10ce, 0x0011, P_SHINKO_S2145, NULL, "olmec-op1000"},
+//	{ 0x0d16, 0xXXXX, P_SHINKO_S2145, NULL, "hiti-p710l"},
+	{ 0, 0, 0, NULL, NULL}
+};
+
 const struct dyesub_backend shinkos2145_backend = {
 	.name = "Shinko/Sinfonia CHC-S2145/S2",
 	.version = "0.68" " (lib " LIBSINFONIA_VER ")",
 	.uri_prefixes = shinkos2145_prefixes,
+	.devices = shinkos2145_devices,
 	.cmdline_usage = shinkos2145_cmdline,
 	.cmdline_arg = shinkos2145_cmdline_arg,
 	.init = shinkos2145_init,
@@ -1234,12 +1243,6 @@ const struct dyesub_backend shinkos2145_backend = {
 	.query_serno = shinkos2145_query_serno,
 	.query_markers = shinkos2145_query_markers,
 	.query_stats = shinkos2145_query_stats,
-	.devices = {
-		{ 0x10ce, 0x000e, P_SHINKO_S2145, NULL, "shinko-chcs2145"},
-		{ 0x10ce, 0x000e, P_SHINKO_S2145, NULL, "sinfonia-chcs2145"}, /* Duplicate */
-		{ 0x10ce, 0x0011, P_SHINKO_S2145, NULL, "olmec-op1000"},
-		{ 0, 0, 0, NULL, NULL}
-	}
 };
 
 /* CHC-S2145 data format

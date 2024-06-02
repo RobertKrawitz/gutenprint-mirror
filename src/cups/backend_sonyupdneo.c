@@ -1,11 +1,11 @@
 /*
- *   Sony UP-D series (new) Photo Printer CUPS backend -- libusb-1.0 version
+ *   Sony UP-D series (new) Photo Printer CUPS backend
  *
- *   (c) 2019-2021 Solomon Peachy <pizza@shaftnet.org>
+ *   (c) 2019-2024 Solomon Peachy <pizza@shaftnet.org>
  *
  *   The latest version of this program can be found at:
  *
- *     https://git.shaftnet.org/cgit/selphy_print.git
+ *     https://git.shaftnet.org/gitea/slp/selphy_print.git
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the Free
@@ -161,7 +161,7 @@ static int updneo_attach(void *vctx, struct dyesub_connection *conn, uint8_t job
 	}
 
 	if (test_mode >= TEST_MODE_NOATTACH && getenv("MEDIA_CODE"))
-		ctx->marker.numtype = atoi(getenv("MEDIA_CODE"));
+		ctx->marker.numtype = strtol(getenv("MEDIA_CODE"), NULL, 16);
 	else
 		ctx->marker.numtype = (ctx->sts.scmdi >> 12) & 0xfff;
 
@@ -257,7 +257,7 @@ static int updneo_read_parse(void *vctx, const void **vjob, int data_fd, int cop
 		}
 
 		/* Payload length */
-		char *tokl = strtok(NULL, "\r\n,");
+		const char *tokl = strtok(NULL, "\r\n,");
 		if (!tokl) {
 			updneo_cleanup_job(job);
 			ERROR("Invalid spool format (block length missing)!\n");
@@ -415,6 +415,8 @@ static int updneo_get_status(struct updneo_ctx *ctx)
 
 	/* Parse out data */
 	for (i = 0; i < dlen ; i++) {
+		if(!dict[i].key || !dict[i].val)
+			continue;
 		if (!strcmp("SCDIV", dict[i].key)) {
 			ctx->sts.scdiv = strtol(dict[i].val, NULL, 16);
 		} else if (!strcmp("SCSYV", dict[i].key)) {
@@ -423,9 +425,9 @@ static int updneo_get_status(struct updneo_ctx *ctx)
 			strncpy(ctx->sts.scsno, dict[i].val, sizeof(ctx->sts.scsno) - 1);
 
 			/* Trim trailing '-'s off of serial number (UP-D898, UP-9x1)*/
-			for (int i = 0; i < (int) sizeof(ctx->sts.scsno); i++) {
-				if (ctx->sts.scsno[i] == '-') {
-					ctx->sts.scsno[i] = 0;
+			for (int j = 0; j < (int) sizeof(ctx->sts.scsno); j++) {
+				if (ctx->sts.scsno[j] == '-') {
+					ctx->sts.scsno[j] = 0;
 					break;
 				}
 			}
@@ -696,11 +698,24 @@ static const char *sonyupdneo_prefixes[] = {
 	NULL
 };
 
+static const struct device_id sonyupdneo_devices[] = {
+	{ 0x054c, 0x0877, P_SONY_UPD898, NULL, "sony-upd898"},
+//	{ 0x054c, 0x589a, P_SONY_UPD898, NULL, "sony-upd898"}, // ???
+	{ 0x054c, 0xbcde, P_SONY_UPCR20L, NULL, "sony-upcr20l"}, // XXXX
+	{ 0x054c, 0x03c5, P_SONY_UPDR80, NULL, "sony-updr80"},
+	{ 0x054c, 0x03c3, P_SONY_UPDR80, NULL, "sony-updr80md"},
+	{ 0x054c, 0x03c4, P_SONY_UPDR80, NULL, "stryker-sdp1000"},
+	{ 0x054c, 0x0873, P_SONY_UP9x1, NULL, "sony-up971ad"},
+//	{ 0x054c, 0x0873, P_SONY_UP9x1, NULL, "sony-up991ad"},	// Dupe ?
+	{ 0, 0, 0, NULL, NULL}
+};
+
 const struct dyesub_backend sonyupdneo_backend = {
 	.name = "Sony UP-D Neo",
-	.version = "0.18",
+	.version = "0.20",
 	.flags = BACKEND_FLAG_BADISERIAL, /* UP-D898MD at least */
 	.uri_prefixes = sonyupdneo_prefixes,
+	.devices = sonyupdneo_devices,
 	.cmdline_arg = updneo_cmdline_arg,
 	.cmdline_usage = updneo_cmdline,
 	.init = updneo_init,
@@ -710,17 +725,6 @@ const struct dyesub_backend sonyupdneo_backend = {
 	.main_loop = updneo_main_loop,
 	.query_markers = updneo_query_markers,
 	.query_serno = updneo_query_serno,
-	.devices = {
-		{ 0x054c, 0x0877, P_SONY_UPD898, NULL, "sony-upd898"},
-//		{ 0x054c, 0x589a, P_SONY_UPD898, NULL, "sony-upd898"}, // ???
-		{ 0x054c, 0xbcde, P_SONY_UPCR20L, NULL, "sony-upcr20l"}, // XXXX
-		{ 0x054c, 0x03c5, P_SONY_UPDR80, NULL, "sony-updr80"},
-		{ 0x054c, 0x03c3, P_SONY_UPDR80, NULL, "sony-updr80md"},
-		{ 0x054c, 0x03c4, P_SONY_UPDR80, NULL, "stryker-sdp1000"},
-		{ 0x054c, 0x0873, P_SONY_UP9x1, NULL, "sony-up971ad"},
-//		{ 0x054c, 0x0873, P_SONY_UP9x1, NULL, "sony-up991ad"},	// Dupe ?
-		{ 0, 0, 0, NULL, NULL}
-	}
 };
 
 /* Sony UP-D (new) printer spool format

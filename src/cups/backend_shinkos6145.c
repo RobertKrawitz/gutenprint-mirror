@@ -1,13 +1,13 @@
 /*
- *   Shinko/Sinfonia CHC-S6145 CUPS backend -- libusb-1.0 version
+ *   Shinko/Sinfonia CHC-S6145 CUPS backend
  *
- *   (c) 2015-2021 Solomon Peachy <pizza@shaftnet.org>
+ *   (c) 2015-2024 Solomon Peachy <pizza@shaftnet.org>
  *
  *   Low-level documentation was provided by Sinfonia.  Thank you!
  *
  *   The latest version of this program can be found at:
  *
- *     https://git.shaftnet.org/cgit/selphy_print.git
+ *     https://git.shaftnet.org/gitea/slp/selphy_print.git
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the Free
@@ -50,7 +50,7 @@
 typedef void (*dump_announceFN)(FILE *fp);
 
 typedef int (*ImageProcessingFN)(unsigned char *, unsigned short *, void *);
-typedef int (*ImageAvrCalcFN)(unsigned char *, unsigned short, unsigned short, unsigned char *);
+typedef int (*ImageAvrCalcFN)(const unsigned char *, unsigned short, unsigned short, unsigned char *);
 
 #define LIB6145_NAME    "libS6145ImageProcess" DLL_SUFFIX    // Official library
 #define LIB6145_NAME_RE "libS6145ImageReProcess" DLL_SUFFIX // Reimplemented library
@@ -765,8 +765,6 @@ static int get_status(struct shinkos6145_ctx *ctx)
 			val = 60;
 		else if (val == 4)
 			val = 120;
-		else if (val >= 5)
-			val = 240;
 		else
 			val = 240; // default?
 
@@ -793,7 +791,7 @@ static void dump_mediainfo(struct sinfonia_6x45_mediainfo_resp *resp, int is_car
 	}
 }
 
-static int shinkos6145_dump_corrdata(struct shinkos6145_ctx *ctx, char *fname)
+static int shinkos6145_dump_corrdata(struct shinkos6145_ctx *ctx, const char *fname)
 {
 	int ret;
 
@@ -827,7 +825,7 @@ static int shinkos6145_dump_corrdata(struct shinkos6145_ctx *ctx, char *fname)
 	return ret;
 }
 
-static int shinkos6145_dump_eeprom(struct shinkos6145_ctx *ctx, char *fname)
+static int shinkos6145_dump_eeprom(struct shinkos6145_ctx *ctx, const char *fname)
 {
 	int ret;
 
@@ -1275,7 +1273,7 @@ static int shinkos6145_attach(void *vctx, struct dyesub_connection *conn, uint8_
 	} else {
 		int media_code = RIBBON_6x8;
 		if (getenv("MEDIA_CODE"))
-			media_code = atoi(getenv("MEDIA_CODE"));
+			media_code = strtol(getenv("MEDIA_CODE"), NULL, 16);
 
 		ctx->media.ribbon_code = media_code;
 	}
@@ -1533,7 +1531,7 @@ static int shinkos6145_main_loop(void *vctx, const void *vjob, int wait_for_retu
 	if (ctx->is_2245) {
 		struct sinfonia_settime_cmd settime;
 		time_t now = time(NULL);
-		struct tm *cur = localtime(&now);
+		const struct tm *cur = localtime(&now);
 
 		memset(&settime, 0, sizeof(settime));
 		settime.hdr.cmd = cpu_to_le16(SINFONIA_CMD_SETTIME);
@@ -1763,8 +1761,7 @@ top:
 			if (job->jp.quality)
 				print.options |= 0x08;
 			print.media = 0;  /* ignore job->jp.media! */
-
-			print.ipp = SINFONIA_PRINT28_IPP_CONTOUR; // XXX make configurable?
+			print.ipp = 0;    /* Not used */
 			print.method = cpu_to_le32(job->jp.method | SINFONIA_PRINT28_METHOD_ERR_RECOVERY | SINFONIA_PRINT28_METHOD_PREHEAT);
 
 			if ((ret = sinfonia_docmd(&ctx->dev,
@@ -1959,10 +1956,22 @@ static const char *shinkos6145_prefixes[] = {
 	NULL
 };
 
+static const struct device_id shinkos6145_devices[] = {
+	{ 0x10ce, 0x0019, P_SHINKO_S6145, NULL, "sinfonia-chcs6145"},
+	{ 0x10ce, 0x0019, P_SHINKO_S6145, NULL, "shinko-chcs6145"}, /* Duplicate */
+	{ 0x10ce, 0x001e, P_SHINKO_S6145D, NULL, "ciaat-brava-21"},
+	{ 0x10ce, 0x0039, P_SHINKO_S2245, NULL, "sinfonia-chcs2245"},
+	{ 0x29cc, 0x0003, P_KODAK_6900, NULL, "kodak-6900"},      /* aka CHC-S2245-6A */
+	{ 0x29cc, 0x0004, P_KODAK_6900, NULL, "kodak-6950"},      /* aka CHC-S2245-6C */
+	{ 0x0d16, 0x0010, P_SHINKO_S2245, NULL, "hiti-m610"},     /* aka CHC-S2245-5F */
+	{ 0, 0, 0, NULL, NULL}
+};
+
 const struct dyesub_backend shinkos6145_backend = {
 	.name = "Shinko/Sinfonia CHC-S6145/CS2/S2245/S3",
-	.version = "0.49" " (lib " LIBSINFONIA_VER ")",
+	.version = "0.50" " (lib " LIBSINFONIA_VER ")",
 	.uri_prefixes = shinkos6145_prefixes,
+	.devices = shinkos6145_devices,
 	.cmdline_usage = shinkos6145_cmdline,
 	.cmdline_arg = shinkos6145_cmdline_arg,
 	.init = shinkos6145_init,
@@ -1975,16 +1984,6 @@ const struct dyesub_backend shinkos6145_backend = {
 	.query_markers = shinkos6145_query_markers,
 	.query_stats = shinkos6145_query_stats,
 	.combine_jobs = shinkos6145_combine_jobs,
-	.devices = {
-		{ 0x10ce, 0x0019, P_SHINKO_S6145, NULL, "sinfonia-chcs6145"},
-		{ 0x10ce, 0x0019, P_SHINKO_S6145, NULL, "shinko-chcs6145"}, /* Duplicate */
-		{ 0x10ce, 0x001e, P_SHINKO_S6145D, NULL, "ciaat-brava-21"},
-		{ 0x10ce, 0x0039, P_SHINKO_S2245, NULL, "sinfonia-chcs2245"},
-		{ 0x29cc, 0x0003, P_KODAK_6900, NULL, "kodak-6900"},      /* aka CHC-S2245-6A */
-		{ 0x29cc, 0x0004, P_KODAK_6900, NULL, "kodak-6950"},      /* aka CHC-S2245-6C */
-		{ 0x0d16, 0x0010, P_SHINKO_S2245, NULL, "hiti-m610"},
-		{ 0, 0, 0, NULL, NULL}
-	}
 };
 
 /* CHC-S6145 spool file format

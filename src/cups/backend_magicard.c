@@ -1,11 +1,11 @@
 /*
- *   Magicard card printer family CUPS backend -- libusb-1.0 version
+ *   Magicard card printer family CUPS backend
  *
- *   (c) 2017-2023 Solomon Peachy <pizza@shaftnet.org>
+ *   (c) 2017-2024 Solomon Peachy <pizza@shaftnet.org>
  *
  *   The latest version of this program can be found at:
  *
- *     https://git.shaftnet.org/cgit/selphy_print.git
+ *     https://git.shaftnet.org/gitea/slp/selphy_print.git
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the Free
@@ -124,7 +124,7 @@ struct magicard_cmd_simple_header {
 struct magicard_resp_header {
 	uint8_t guard[1]; /* 0x01 */
 	uint8_t subcmd_arg[7]; /* '???,???' */
-	uint8_t data[0]; /* freeform resp */
+	uint8_t data[];  /* freeform resp */
 //	uint8_t term[2]; /* 0x2c 0x03 terminates! */
 };
 
@@ -723,6 +723,7 @@ static int magicard_read_parse(void *vctx, const void **vjob, int data_fd, int c
 	if (job->datalen + remain > MAX_PRINTJOB_LEN) {
 		ERROR("Buffer overflow when parsing printjob! (%d+%d)\n",
 		      job->datalen, remain);
+		magicard_cleanup_job(job);
 		return CUPS_BACKEND_CANCEL;
 	}
 
@@ -927,10 +928,20 @@ static const char *magicard_prefixes[] = {
 	NULL
 };
 
+static const struct device_id magicard_devices[] = {
+	{ 0x0c1f, 0x1800, P_MAGICARD, NULL, "magicard-tango2e"},
+//	{ 0x0c1f, 0x1800, P_MAGICARD, NULL, "magicard-rio2e"},
+	{ 0x0c1f, 0x4800, P_MAGICARD, NULL, "magicard-enduro"}, // ??
+	{ 0x0c1f, 0x880a, P_MAGICARD, NULL, "magicard-enduroplus"}, // ??
+	{ 0x0c1f, 0xFFFF, P_MAGICARD, NULL, "magicard"},
+	{ 0, 0, 0, NULL, NULL}
+};
+
 const struct dyesub_backend magicard_backend = {
 	.name = "Magicard family",
-	.version = "0.19",
+	.version = "0.20",
 	.uri_prefixes = magicard_prefixes,
+	.devices = magicard_devices,
 	.cmdline_arg = magicard_cmdline_arg,
 	.cmdline_usage = magicard_cmdline,
 	.init = magicard_init,
@@ -939,17 +950,7 @@ const struct dyesub_backend magicard_backend = {
 	.read_parse = magicard_read_parse,
 	.main_loop = magicard_main_loop,
 	.query_markers = magicard_query_markers,
-	.devices = {
-		{ 0x0c1f, 0x1800, P_MAGICARD, NULL, "magicard-tango2e"},
-//		{ 0x0c1f, 0x1800, P_MAGICARD, NULL, "magicard-rio2e"},
-		{ 0x0c1f, 0x4800, P_MAGICARD, NULL, "magicard-enduro"}, // ??
-		{ 0x0c1f, 0x880a, P_MAGICARD, NULL, "magicard-enduroplus"}, // ??
-		{ 0x0c1f, 0xFFFF, P_MAGICARD, NULL, "magicard"},
-		{ 0, 0, 0, NULL, NULL}
-	}
 };
-
-
 
 /* Magicard family Spool file format (Tango2e/Rio2e/AvalonE family)
 

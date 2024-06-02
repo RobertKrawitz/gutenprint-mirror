@@ -1,11 +1,11 @@
 /*
  *   Mitsubishi CP-9xxx Photo Printer Family CUPS backend
  *
- *   (c) 2014-2023 Solomon Peachy <pizza@shaftnet.org>
+ *   (c) 2014-2024 Solomon Peachy <pizza@shaftnet.org>
  *
  *   The latest version of this program can be found at:
  *
- *     https://git.shaftnet.org/cgit/selphy_print.git
+ *     https://git.shaftnet.org/gitea/slp/selphy_print.git
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the Free
@@ -401,7 +401,7 @@ static int mitsu9550_attach(void *vctx, struct dyesub_connection *conn, uint8_t 
 	} else {
 		int media_code = 0x2;
 		if (getenv("MEDIA_CODE"))
-			media_code = atoi(getenv("MEDIA_CODE")) & 0xf;
+			media_code = strtol(getenv("MEDIA_CODE"), NULL, 16) & 0xf;
 
 		media.max = cpu_to_be16(400);
 		media.remain = cpu_to_be16(330);
@@ -1128,6 +1128,7 @@ static int mitsu9550_main_loop(void *vctx, const void *vjob, int wait_for_return
 			return i;
 		}
 	}
+	job->is_raw = 1;
 
 non_98xx:
 	/* Bypass */
@@ -1638,11 +1639,42 @@ static const char *mitsu9550_prefixes[] = {
 	NULL
 };
 
+static const struct device_id mitsu9550_devices[] = {
+//	{ 0x06d3, 0x0380, P_MITSU_9550, NULL, "mitsubishi-8000d"},
+//	{ 0x06d3, 0x0381, P_MITSU_9550, NULL, "mitsubishi-770d"},
+//	{ 0x06d3, 0x0385, P_MITSU_9550, NULL, "mitsubishi-900d"},
+//	{ 0x06d3, 0x0387, P_MITSU_9550, NULL, "mitsubishi-980d"},
+//	{ 0x06d3, 0x038b, P_MITSU_CP3020, NULL, "mitsubishi-cp3020d"},
+//	{ 0x06d3, 0x038c, P_MITSU_9550, NULL, "mitsubishi-900did"},
+	{ 0x06d3, 0x0395, P_MITSU_9550, NULL, "mitsubishi-9000dw"}, // XXX -am instead?
+	{ 0x06d3, 0x0393, P_MITSU_9550, NULL, "mitsubishi-9500dw"},
+	{ 0x06d3, 0x0394, P_MITSU_9550, NULL, "mitsubishi-9000dw"},
+	{ 0x06d3, 0x039e, P_MITSU_9500S, NULL, "mitsubishi-9500dw-s"},
+	{ 0x06d3, 0x03a1, P_MITSU_9550, NULL, "mitsubishi-9550dw"},
+	{ 0x06d3, 0x03a1, P_MITSU_9550, NULL, "mitsubishi-9550d"}, /* Duplicate */
+	{ 0x06d3, 0x03a5, P_MITSU_9550S, NULL, "mitsubishi-9550dw-s"}, // or DZ/DZS/DZU
+	{ 0x06d3, 0x03a5, P_MITSU_9550S, NULL, "mitsubishi-9550dz"}, /* Duplicate */
+	{ 0x06d3, 0x03a6, P_MITSU_9600S, NULL, "mitsubishi-9600dw-s"},
+	{ 0x06d3, 0x03a9, P_MITSU_9600, NULL, "mitsubishi-9600dw"},
+//	{ 0x06d3, 0x03aa, P_MITSU_CP3020, NULL, "mitsubishi-cp3020da"},
+	{ 0x06d3, 0x03ab, P_MITSU_CP30D, NULL, "mitsubishi-cp30dw"},
+	{ 0x06d3, 0x03ad, P_MITSU_9800, NULL, "mitsubishi-9800dw"},
+	{ 0x06d3, 0x03ad, P_MITSU_9800, NULL, "mitsubishi-9800d"}, /* Duplicate */
+	{ 0x06d3, 0x03ae, P_MITSU_9800S, NULL, "mitsubishi-9800dw-s"},
+	{ 0x06d3, 0x03ae, P_MITSU_9800S, NULL, "mitsubishi-9800dz"}, /* Duplicate */
+	{ 0x06d3, 0x3b20, P_MITSU_9820S, NULL, "mitsubishi-9820dw-ag"},
+	{ 0x06d3, 0x3b21, P_MITSU_9810, NULL, "mitsubishi-9810dw"},
+	{ 0x06d3, 0x3b21, P_MITSU_9810, NULL, "mitsubishi-9810d"}, /* Duplicate */
+//	{ 0x06d3, 0x3b2f, P_MITSU_9810, NULL, "mitsubishi-ls9820a"},
+	{ 0, 0, 0, NULL, NULL}
+};
+
 /* Exported */
 const struct dyesub_backend mitsu9550_backend = {
 	.name = "Mitsubishi CP9xxx family",
-	.version = "0.70" " (lib " LIBMITSU_VER ")",
+	.version = "0.71" " (lib " LIBMITSU_VER ")",
 	.uri_prefixes = mitsu9550_prefixes,
+	.devices = mitsu9550_devices,
 	.cmdline_usage = mitsu9550_cmdline,
 	.cmdline_arg = mitsu9550_cmdline_arg,
 	.init = mitsu9550_init,
@@ -1653,35 +1685,6 @@ const struct dyesub_backend mitsu9550_backend = {
 	.main_loop = mitsu9550_main_loop,
 	.query_serno = mitsu9550_query_serno,
 	.query_markers = mitsu9550_query_markers,
-	.devices = {
-//		{ 0x06d3, 0x0380, P_MITSU_9550, NULL, "mitsubishi-8000d"},
-//		{ 0x06d3, 0x0381, P_MITSU_9550, NULL, "mitsubishi-770d"},
-//		{ 0x06d3, 0x0385, P_MITSU_9550, NULL, "mitsubishi-900d"},
-//		{ 0x06d3, 0x0387, P_MITSU_9550, NULL, "mitsubishi-980d"},
-//		{ 0x06d3, 0x038b, P_MITSU_CP3020, NULL, "mitsubishi-cp3020d"},
-//		{ 0x06d3, 0x038c, P_MITSU_9550, NULL, "mitsubishi-900did"},
-		{ 0x06d3, 0x0395, P_MITSU_9550, NULL, "mitsubishi-9000dw"}, // XXX -am instead?
-		{ 0x06d3, 0x0393, P_MITSU_9550, NULL, "mitsubishi-9500dw"},
-		{ 0x06d3, 0x0394, P_MITSU_9550, NULL, "mitsubishi-9000dw"},
-		{ 0x06d3, 0x039e, P_MITSU_9500S, NULL, "mitsubishi-9500dw-s"},
-		{ 0x06d3, 0x03a1, P_MITSU_9550, NULL, "mitsubishi-9550dw"},
-		{ 0x06d3, 0x03a1, P_MITSU_9550, NULL, "mitsubishi-9550d"}, /* Duplicate */
-		{ 0x06d3, 0x03a5, P_MITSU_9550S, NULL, "mitsubishi-9550dw-s"}, // or DZ/DZS/DZU
-		{ 0x06d3, 0x03a5, P_MITSU_9550S, NULL, "mitsubishi-9550dz"}, /* Duplicate */
-		{ 0x06d3, 0x03a6, P_MITSU_9600S, NULL, "mitsubishi-9600dw-s"},
-		{ 0x06d3, 0x03a9, P_MITSU_9600, NULL, "mitsubishi-9600dw"},
-//		{ 0x06d3, 0x03aa, P_MITSU_CP3020, NULL, "mitsubishi-cp3020da"},
-		{ 0x06d3, 0x03ab, P_MITSU_CP30D, NULL, "mitsubishi-cp30dw"},
-		{ 0x06d3, 0x03ad, P_MITSU_9800, NULL, "mitsubishi-9800dw"},
-		{ 0x06d3, 0x03ad, P_MITSU_9800, NULL, "mitsubishi-9800d"}, /* Duplicate */
-		{ 0x06d3, 0x03ae, P_MITSU_9800S, NULL, "mitsubishi-9800dw-s"},
-		{ 0x06d3, 0x03ae, P_MITSU_9800S, NULL, "mitsubishi-9800dz"}, /* Duplicate */
-		{ 0x06d3, 0x3b20, P_MITSU_9820S, NULL, "mitsubishi-9820dw-ag"},
-		{ 0x06d3, 0x3b21, P_MITSU_9810, NULL, "mitsubishi-9810dw"},
-		{ 0x06d3, 0x3b21, P_MITSU_9810, NULL, "mitsubishi-9810d"}, /* Duplicate */
-//		{ 0x06d3, 0x3b2f, P_MITSU_9810, NULL, "mitsubishi-ls9820a"},
-		{ 0, 0, 0, NULL, NULL}
-	}
 };
 
 /* Mitsubish CP-30/9500/9550/9600/9800/9810/9820 spool format:

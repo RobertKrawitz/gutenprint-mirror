@@ -1,11 +1,11 @@
 /*
  *   CUPS Backend common code
  *
- *   Copyright (c) 2007-2023 Solomon Peachy <pizza@shaftnet.org>
+ *   Copyright (c) 2007-2024 Solomon Peachy <pizza@shaftnet.org>
  *
  *   The latest version of this program can be found at:
  *
- *     https://git.shaftnet.org/cgit/selphy_print.git
+ *     https://git.shaftnet.org/gitea/slp/selphy_print.git
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the Free
@@ -29,7 +29,7 @@
 #include <signal.h>
 #include <strings.h>  /* For strncasecmp */
 
-#define BACKEND_VERSION "0.126G"
+#define BACKEND_VERSION "0.132G"
 
 #ifndef CORRTABLE_PATH
 #ifdef PACKAGE_DATA_DIR
@@ -64,7 +64,7 @@ const char *corrtable_path = CORRTABLE_PATH;
 static int max_xfer_size = URB_XFER_SIZE;
 static int xfer_timeout = XFER_TIMEOUT;
 
-#ifdef OLD_URI
+#if defined(OLD_URI) && OLD_URI
 static int old_uri = 1;
 #else
 static int old_uri = 0;
@@ -205,6 +205,9 @@ int parse1284_data(const char *device_id, struct deviceid_dict* dict)
 			ptr--;
 		*ptr = 0;
 		device_id++;
+
+		if (!strlen(key) || strlen(val))
+			continue;
 
 		/* Add it to the dictionary */
 		dict[num].key = strdup(key);
@@ -1013,7 +1016,7 @@ static void dump_stats(struct dyesub_backend *backend, struct printerstats *stat
 void print_license_blurb(void)
 {
 	const char *license = "\n\
-Copyright 2007-2023 Solomon Peachy <pizza AT shaftnet DOT org>\n\
+Copyright 2007-2024 Solomon Peachy <pizza AT shaftnet DOT org>\n\
 \n\
 This program is free software; you can redistribute it and/or modify it\n\
 under the terms of the GNU General Public License as published by the Free\n\
@@ -1344,7 +1347,7 @@ int main (int argc, char **argv)
 
 	DEBUG("Multi-Call Dye-sublimation CUPS Backend version %s\n",
 	      BACKEND_VERSION);
-	DEBUG("Copyright 2007-2023 Solomon Peachy\n");
+	DEBUG("Copyright 2007-2024 Solomon Peachy\n");
 	DEBUG("This free software comes with ABSOLUTELY NO WARRANTY! \n");
 	DEBUG("Licensed under the GNU GPL.  Run with '-G' for more details.\n");
 	DEBUG("\n");
@@ -1958,31 +1961,88 @@ const void *dyesub_joblist_popjob(struct dyesub_joblist *list)
 	return NULL;
 }
 
-int dyesub_pano_split_rgb8(const uint8_t *src, uint16_t cols,
-			   uint16_t src_rows, uint8_t numpanels,
-			   uint16_t overlap_rows, uint16_t max_rows,
-			   uint8_t *panels[3],
-			   uint16_t panel_rows[3])
+#include "backend_panodata.h"
+#define PROCESS_PIXEL(__corr, __offset)				\
+	data[(r * cols * 3) + c + __offset] = 255 - ((255 - (double)data[(r * cols *3) + c +__offset]) * (__corr))
+
+static void dyesub_pano_process_rgb8(const struct dnp_panodata *pano,
+				     uint8_t *data, int lh, int rh,
+				     uint16_t cols, uint16_t rows,
+				     uint16_t overlap, uint16_t pad_rows)
 {
-	/* Do nothing if there's no point */
-	if (numpanels < 2 || src_rows <= max_rows)
-		return CUPS_BACKEND_OK;
+	/* Skip over start margin in source */
+	data += pad_rows * cols * 3;
 
-	/* Work out panel sizes if not specified */
-	if (panel_rows[0] == 0) {
-		panel_rows[0] = max_rows;
-		panel_rows[1] = src_rows - panel_rows[0] + overlap_rows;
-		if (numpanels > 2)
-			panel_rows[2] = src_rows - panel_rows[0] - panel_rows[1] + overlap_rows*2;
+	for (int r = 0 ; r < rows ; r++) {
+		if (rh && r < overlap) {
+			const struct panodata_row *rhc;
+			int i, c;
+			int row = (overlap - r);
+			for (i = 0 ; i < pano->elements-1 ; i++) {
+				if (row >= pano->rows[i].start_row && row < pano->rows[i+1].start_row)
+					break;
+			}
+			rhc = &pano->rows[i];
+			for (c = 0 ; c < cols ; c++) {
+				PROCESS_PIXEL(rhc->rhYMC[2],0); /* R/C */
+				PROCESS_PIXEL(rhc->rhYMC[1],1); /* G/M */
+				PROCESS_PIXEL(rhc->rhYMC[0],2); /* B/Y */
+			}
+		} else if (lh && (rows - r) < overlap) {
+			const struct panodata_row *lhc;
+			int i, c;
+			int row = (rows -r);
+			for (i = 0 ; i < pano->elements-1 ; i++) {
+				if (row >= pano->rows[i].start_row && row < pano->rows[i+1].start_row)
+					break;
+			}
+			lhc = &pano->rows[i];
+			for (c = 0 ; c < cols ; c++) {
+				PROCESS_PIXEL(lhc->rhYMC[2],0); /* R/C */
+				PROCESS_PIXEL(lhc->rhYMC[1],1); /* G/M */
+				PROCESS_PIXEL(lhc->rhYMC[0],2); /* B/Y */
+			}
+		}
 	}
+}
 
-	/* Copy panel data */
-	memcpy(panels[0], src, cols * panel_rows[0] * 3);
-	memcpy(panels[1], src + (panel_rows[0] - overlap_rows) * 3, cols * panel_rows[1] * 3);
-	if (numpanels > 2)
-		memcpy(panels[2], src + (panel_rows[0] - overlap_rows + panel_rows[1] - overlap_rows) * 3, cols * panel_rows[2] * 3);
+void dyesub_pano_split_rgb8(const uint8_t *src, uint16_t cols, uint8_t numpanels,
+			    uint16_t overlap_rows, uint16_t pad_rows,
+			    uint16_t *panel_rows, uint8_t **panels)
+{
+	int i = 0;
 
-	return CUPS_BACKEND_OK;
+	INFO("Splitting job into %d panel continuous panorama\n", numpanels);
+
+	/* Skip over start margin in source */
+	src += pad_rows * cols * 3;
+
+	for (i = 0 ; i < numpanels ; i++) {
+		int lh = (i < (numpanels -1));
+		int rh = (i > 0);
+		uint8_t *out = panels[i];
+
+		/* Fill start margin with white */
+		if (pad_rows) {
+			memset(out, 0xff, pad_rows * cols * 3);
+			out += pad_rows * cols * 3;
+		}
+
+		/* Copy over panel data */
+		memcpy(out, src, panel_rows[i] * cols * 3);
+		src += (panel_rows[i] - overlap_rows) * cols * 3; /* Factor in overlap */
+		out += panel_rows[i] * cols * 3;
+
+		/* Fill end margin with white */
+		if (pad_rows) {
+			memset(out, 0xff, pad_rows * cols * 3);
+			out += pad_rows * cols * 3;
+		}
+
+		dyesub_pano_process_rgb8(&panodata, panels[i], lh, rh,
+					 cols, panel_rows[i],
+					 overlap_rows, pad_rows);
+	}
 }
 
 int dyesub_joblist_canwait(struct dyesub_joblist *list)

@@ -1,11 +1,11 @@
 /*
- *   Kodak 8800/9810 Photo Printer CUPS backend -- libusb-1.0 version
+ *   Kodak 8800/9810 Photo Printer CUPS backend
  *
- *   (c) 2021 Solomon Peachy <pizza@shaftnet.org>
+ *   (c) 2021-2024 Solomon Peachy <pizza@shaftnet.org>
  *
  *   The latest version of this program can be found at:
  *
- *     https://git.shaftnet.org/cgit/selphy_print.git
+ *     https://git.shaftnet.org/gitea/slp/selphy_print.git
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the Free
@@ -917,11 +917,18 @@ static const char *kodak8800_prefixes[] = {
 	NULL
 };
 
+static const struct device_id kodak8800_devices[] = {
+	{ 0x040a, 0x4023, P_KODAK_8800, "Kodak", "kodak-8800"},
+	{ 0x040a, 0x4023, P_KODAK_8800, "Kodak", "kodak-9810"}, // duplicate
+	{ 0, 0, 0, NULL, NULL}
+};
+
 /* Exported */
 const struct dyesub_backend kodak8800_backend = {
 	.name = "Kodak 8800/9810",
 	.version = "0.07",
 	.uri_prefixes = kodak8800_prefixes,
+	.devices = kodak8800_devices,
 	.cmdline_usage = kodak8800_cmdline,
 	.cmdline_arg = kodak8800_cmdline_arg,
 	.init = kodak8800_init,
@@ -932,11 +939,6 @@ const struct dyesub_backend kodak8800_backend = {
 	.query_serno = kodak8800_query_serno,
 	.query_markers = kodak8800_query_markers,
 	.query_stats = kodak8800_query_stats,
-	.devices = {
-		{ 0x040a, 0x4023, P_KODAK_8800, "Kodak", "kodak-8800"},
-		{ 0x040a, 0x4023, P_KODAK_8800, "Kodak", "kodak-9810"}, // duplicate
-		{ 0, 0, 0, NULL, NULL}
-	}
 };
 
 /*

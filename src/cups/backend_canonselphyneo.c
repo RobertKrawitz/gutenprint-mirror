@@ -1,11 +1,11 @@
 /*
- *   Canon SELPHY CPneo series CUPS backend -- libusb-1.0 version
+ *   Canon SELPHY CPneo series CUPS backend
  *
- *   (c) 2016-2022 Solomon Peachy <pizza@shaftnet.org>
+ *   (c) 2016-2024 Solomon Peachy <pizza@shaftnet.org>
  *
  *   The latest version of this program can be found at:
  *
- *     https://git.shaftnet.org/cgit/selphy_print.git
+ *     https://git.shaftnet.org/gitea/slp/selphy_print.git
  *
  *   This program is free software; you can redistribute it and/or modify it
  *   under the terms of the GNU General Public License as published by the Free
@@ -229,7 +229,7 @@ static int selphyneo_attach(void *vctx, struct dyesub_connection *conn, uint8_t 
 		rdback.data[2] = 0;
 		rdback.data[6] = 0x01;
 		if (getenv("MEDIA_CODE"))
-			rdback.data[6] = atoi(getenv("MEDIA_CODE"));
+			rdback.data[6] = strtol(getenv("MEDIA_CODE"), NULL, 16);
 	}
 
 	ctx->marker.color = "#00FFFF#FF00FF#FFFF00";
@@ -532,6 +532,16 @@ static const char *canonselphyneo_prefixes[] = {
 	NULL
 };
 
+static const struct device_id selphyneo_devices[] = {
+	{ 0x04a9, 0x327b, P_CP910, NULL, "canon-cp820"},
+	{ 0x04a9, 0x327a, P_CP910, NULL, "canon-cp910"},
+	{ 0x04a9, 0x32ae, P_CP910, NULL, "canon-cp1000"},
+	{ 0x04a9, 0x32b1, P_CP910, NULL, "canon-cp1200"},
+	{ 0x04a9, 0x32db, P_CP910, NULL, "canon-cp1300"},
+	{ 0x04a9, 0x3302, P_CP910, NULL, "canon-cp1500"},
+	{ 0, 0, 0, NULL, NULL}
+};
+
 const struct dyesub_backend canonselphyneo_backend = {
 	.name = "Canon SELPHY CP (new)",
 	.version = "0.24",
@@ -544,15 +554,7 @@ const struct dyesub_backend canonselphyneo_backend = {
 	.read_parse = selphyneo_read_parse,
 	.main_loop = selphyneo_main_loop,
 	.query_markers = selphyneo_query_markers,
-	.devices = {
-		{ 0x04a9, 0x327b, P_CP910, NULL, "canon-cp820"},
-		{ 0x04a9, 0x327a, P_CP910, NULL, "canon-cp910"},
-		{ 0x04a9, 0x32ae, P_CP910, NULL, "canon-cp1000"},
-		{ 0x04a9, 0x32b1, P_CP910, NULL, "canon-cp1200"},
-		{ 0x04a9, 0x32db, P_CP910, NULL, "canon-cp1300"},
-		{ 0x04a9, 0x3302, P_CP910, NULL, "canon-cp1500"},
-		{ 0, 0, 0, NULL, NULL}
-	}
+	.devices = selphyneo_devices,
 };
 /*
 
