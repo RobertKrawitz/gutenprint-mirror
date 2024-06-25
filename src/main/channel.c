@@ -1136,7 +1136,7 @@ do_gcr(stpi_channel_group_t *cg, unsigned *zero_mask)
 	  output[1] += ck * cg->cyan_balance;
 	  output[2] += ck * cg->magenta_balance;
 	  output[3] += ck * cg->yellow_balance;
-          nzx.nzl += ((unsigned long long) output[0]) + ((unsigned long long) output[1] << 16) + ((unsigned long long) output[2] << 32) + ((unsigned long long) output[3] << 48);
+	  nzx.nzl |= *(unsigned long long *) output;
 	}
       output += cg->gcr_channels;
     }
