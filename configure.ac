@@ -691,12 +691,14 @@ if test x$ac_compiler_gnu = "xyes"; then
   fi
   if test x$ENABLE_DEBUG = xyes ; then
     STP_ADD_COMPILER_ARG([-g])
+    STP_ADD_COMPILER_ARG([-Og])
   else
     STP_ADD_FIRST_COMPILER_ARG([-O3 -O2 -O1 -O])
   fi
 else
   if test x$ENABLE_DEBUG = xyes ; then
     STP_ADD_COMPILER_ARG([-g])
+    STP_ADD_COMPILER_ARG([-Og])
   else
     STP_ADD_FIRST_COMPILER_ARG([-O])
   fi
