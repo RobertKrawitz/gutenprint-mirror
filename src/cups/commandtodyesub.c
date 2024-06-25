@@ -34,9 +34,7 @@ main(int  argc,		/* I - Number of command-line arguments */
      char *argv[])	/* I - Command-line arguments */
 {
   FILE	*fp;		/* Command file */
-  char	line[1024],	/* Line from file */
-	*lineptr;	/* Pointer into line */
-  int	feedpage;	/* Feed the page */
+  char	line[1024];	/* Line from file */
 
 
  /*
